@@ -255,8 +255,9 @@ def generate_python_task(difficulty='easy'):
     api_key = settings.OPENAI_API_KEY
     if not api_key:
         print("Warning: OpenAI API key not set. Using demo assistance.")
-        return None
+        return get_fallback_task(difficulty)
     
+    print(f"Generating {difficulty} task using OpenAI API...")
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}"
@@ -304,16 +305,27 @@ def generate_python_task(difficulty='easy'):
     }
     
     try:
+        print("Sending request to OpenAI API...")
         response = requests.post(
             "https://api.openai.com/v1/chat/completions",
             headers=headers,
             json=payload
         )
+        
+        # Print information about the response
+        print(f"OpenAI API response status: {response.status_code}")
+        if response.status_code != 200:
+            print(f"OpenAI API error: {response.text}")
+            raise Exception(f"OpenAI API returned status code {response.status_code}")
+            
         response.raise_for_status()
         
         content = response.json()["choices"][0]["message"]["content"]
         # Extract JSON from the response
         try:
+            # Print the received content for debugging
+            print(f"Received response content: {content[:100]}...")
+            
             task_json = json.loads(content)
             
             # Validate the response format
@@ -339,6 +351,7 @@ def generate_python_task(difficulty='easy'):
                 print("Expected output is not an integer, setting default")
                 test_case['expected_output'] = "42"  # Default fallback
             
+            print(f"Successfully generated task: {task_json['title']}")
             return task_json
         except json.JSONDecodeError as e:
             print(f"Error parsing JSON from OpenAI: {e}")
@@ -346,17 +359,27 @@ def generate_python_task(difficulty='easy'):
             import re
             json_matches = re.findall(r'```(?:json)?\s*(.*?)\s*```', content, re.DOTALL)
             if json_matches:
+                print("Attempting to parse JSON from code blocks...")
                 try:
                     task_json = json.loads(json_matches[0])
+                    print(f"Successfully extracted task from code block: {task_json['title']}")
                     return task_json
-                except:
-                    print("Failed to parse JSON from code blocks")
+                except Exception as e:
+                    print(f"Failed to parse JSON from code blocks: {e}")
             
             raise ValueError("Failed to parse task JSON")
             
     except Exception as e:
-        print(f"Error generating task: {e}")
-        # Return a minimal fallback task if API fails
+        print(f"Error generating task: {str(e)}")
+        return get_fallback_task(difficulty)
+
+def get_fallback_task(difficulty):
+    """
+    Return a fallback task based on the difficulty level.
+    """
+    print(f"Using fallback {difficulty} task")
+    
+    if difficulty == 'easy':
         return {
             "title": "Sum of Two Numbers",
             "description": "Write a function called 'add_numbers' that takes two parameters (a and b) and returns their sum.",
@@ -364,6 +387,39 @@ def generate_python_task(difficulty='easy'):
                 {
                     "input": "3, 5",
                     "expected_output": "8"
+                }
+            ]
+        }
+    elif difficulty == 'medium':
+        return {
+            "title": "Find the Missing Number",
+            "description": "Write a function that finds the missing number in a sequence of consecutive integers from 1 to n (with one number missing).",
+            "test_cases": [
+                {
+                    "input": "1, 2, 4, 5, 6",
+                    "expected_output": "3"
+                }
+            ]
+        }
+    elif difficulty == 'hard':
+        return {
+            "title": "Maximum Subarray Sum",
+            "description": "Write a function that finds the sum of the contiguous subarray within a one-dimensional array of numbers which has the largest sum.",
+            "test_cases": [
+                {
+                    "input": "-2, 1, -3, 4, -1, 2, 1, -5, 4",
+                    "expected_output": "6"
+                }
+            ]
+        }
+    else:
+        return {
+            "title": "Count the Digits",
+            "description": "Write a function that counts the number of digits in a positive integer.",
+            "test_cases": [
+                {
+                    "input": "12345",
+                    "expected_output": "5"
                 }
             ]
         } 
