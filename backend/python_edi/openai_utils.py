@@ -39,6 +39,7 @@ def process_code_locally(code, test_input=None):
         safe_globals = {
             'print': lambda *args: captured_output.append(' '.join(str(arg) for arg in args)),
             'input': lambda prompt=None: str(test_input) if test_input else '',
+            # Safe math operations
             'len': len,
             'str': str,
             'int': int,
@@ -98,13 +99,38 @@ def process_code_locally(code, test_input=None):
                 pass
         
         try:
-            # Check for dangerous operations
-            if 'import' in code or '__' in code or 'eval(' in code or 'exec(' in code or 'os.' in code or 'subprocess' in code:
-                return {
-                    "success": False,
-                    "output": None,
-                    "error": "Code contains potentially unsafe operations"
-                }
+            # Enhanced security checks for dangerous operations
+            dangerous_patterns = [
+                # System access
+                'import', 'from', '__', 'eval(', 'exec(', 'compile(', 'globals(', 'locals(',  
+                'os.', 'subprocess', 'sys.', 'builtins', 'open(', 'file(', 
+                
+                # Network access
+                'socket', 'urllib', 'requests', 'http', 'ftp', 
+                
+                # File system access
+                'os.path', 'pathlib', 'shutil', 'glob', 'mkdir', 'chdir',
+                
+                # Process control
+                'multiprocessing', 'threading', 'Process', 'fork',
+                
+                # Code introspection
+                'inspect', 'trace', 
+                
+                # Potentially dangerous built-ins
+                'getattr(', 'setattr(', 'delattr(', 'hasattr(', 'dir(', 'vars(',
+                
+                # Security bypasses
+                '.__', '_[', '[\'_', '["_', 'breakpoint', 'pdb', 
+            ]
+            
+            for pattern in dangerous_patterns:
+                if pattern in code:
+                    return {
+                        "success": False,
+                        "output": None,
+                        "error": f"Code contains potentially unsafe operations: {pattern}"
+                    }
                 
             # Limit code length as a simple protection
             if len(code) > 5000:
@@ -114,15 +140,57 @@ def process_code_locally(code, test_input=None):
                     "error": "Code exceeds maximum length limit"
                 }
             
-            # Execute the code in a restricted environment
-            exec(code, safe_globals, local_vars)
+            # Limit loops to prevent infinite loops
+            loop_count = code.count('for ') + code.count('while ')
+            if loop_count > 10:
+                return {
+                    "success": False,
+                    "output": None,
+                    "error": "Code contains too many loops (maximum 10)"
+                }
             
-            # Return the captured output
-            return {
-                "success": True,
-                "output": '\n'.join(captured_output) or "Code executed successfully, but no output was produced.",
-                "error": None
-            }
+            # Add timeout for code execution
+            import signal
+            
+            class TimeoutException(Exception):
+                pass
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutException("Code execution timed out")
+            
+            # Set a 2-second timeout
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(2)
+            
+            try:
+                # Execute the code in a restricted environment
+                exec(code, safe_globals, local_vars)
+                
+                # Cancel the alarm if code finishes within the time limit
+                signal.alarm(0)
+                
+                # Return the captured output
+                return {
+                    "success": True,
+                    "output": '\n'.join(captured_output) or "Code executed successfully, but no output was produced.",
+                    "error": None
+                }
+            except TimeoutException as e:
+                return {
+                    "success": False,
+                    "output": None,
+                    "error": f"Error executing code: {str(e)}"
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "output": None,
+                    "error": f"Error executing code: {str(e)}"
+                }
+            finally:
+                # Ensure alarm is cancelled
+                signal.alarm(0)
+                
         except Exception as e:
             return {
                 "success": False,

@@ -329,13 +329,7 @@ for i in range(1, 6):
         })
         .catch(error => {
             console.error('Error running code:', error);
-            // Fallback to client-side execution if server fails
-            try {
-                const result = evalWithLimits(code);
-                outputContent.textContent = result;
-            } catch (e) {
-                outputContent.textContent = 'Error: ' + e.message;
-            }
+            outputContent.textContent = 'Error: ' + error.message;
         });
     }
 
@@ -521,56 +515,6 @@ for i in range(1, 6):
         });
     }
 
-    // Simple (unsafe) eval with output capturing - for demonstration only
-    // In production, all code execution should happen on the server in a sandbox
-    function evalWithLimits(code) {
-        let output = '';
-        const originalConsoleLog = console.log;
-        
-        // Override console.log to capture output
-        console.log = function(...args) {
-            output += args.join(' ') + '\n';
-            originalConsoleLog.apply(console, args);
-        };
-        
-        try {
-            // Create a safer execution context
-            const safeEval = new Function('code', `
-                try {
-                    // Add print function to simulate Python's print
-                    function print(...args) {
-                        console.log(...args);
-                    }
-                    
-                    // Execute the code
-                    ${code}
-                    
-                    // Return any last expression result
-                    return null;
-                } catch (e) {
-                    throw e;
-                }
-            `);
-            
-            // Set timeout to prevent infinite loops
-            const timeoutId = setTimeout(() => {
-                throw new Error('Execution timed out.');
-            }, 5000);
-            
-            // Execute the code
-            safeEval();
-            
-            clearTimeout(timeoutId);
-        } catch (error) {
-            output += 'Error: ' + error.message;
-        } finally {
-            // Restore console.log
-            console.log = originalConsoleLog;
-        }
-        
-        return output;
-    }
-
     // Function to get CSRF token from cookies
     function getCookie(name) {
         let cookieValue = null;
@@ -600,5 +544,8 @@ for i in range(1, 6):
             return originalFetch(url, options);
         };
     }
+
+    // Initialize CSRF protection
+    addCsrfToFetch();
 </script>
 {% endblock %} 
