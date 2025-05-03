@@ -9,6 +9,7 @@ import tempfile
 from .models import VideoRecording, VideoSummary
 import subprocess
 import base64
+import time
 
 client = genai.Client(
     api_key=os.getenv('GEMINI_API_KEY'),
@@ -60,7 +61,7 @@ def process_video(video_id):
         ]
         duration = float(subprocess.check_output(duration_cmd).decode('utf-8').strip())
         
-        segment_duration = 60
+        segment_duration = 45
         num_segments = int(duration / segment_duration) + (1 if duration % segment_duration > 0 else 0)
         
         for segment in range(num_segments):
@@ -79,7 +80,7 @@ def process_video(video_id):
                 segment_path
             ])
             
-            summary = f"Video segment {segment+1} (from {start_time}s to {start_time + segment_length}s)"
+            summary = get_gemini_summary(segment_path)
             
             with open(segment_path, 'rb') as video_file:
                 segment_data = video_file.read()
@@ -114,19 +115,28 @@ def get_gemini_summary(video_path):
             "Format your summary in a clear, structured manner optimized for retention and review."
         )
 
-        file = client.files.upload(file=video_path)
-        response = client.models.generate_content(
-            model='gemini-1.5-flash',
-            contents=[
-                prompt,
-                file
-            ]
-        )
+        myfile = client.files.upload(file=video_path)
+        print(f"{myfile=}")
+        print(f"{video_path=}")
         
+        video_bytes = open(video_path, 'rb').read()
+
+        response = client.models.generate_content(
+            model='models/gemini-1.5-pro',
+            contents=types.Content(
+                parts=[
+                    types.Part(
+                        inline_data=types.Blob(data=video_bytes, mime_type='video/mp4')
+                    ),
+                    types.Part(text='Please summarize the video in 3 sentences.')
+                ]
+            )
+        )
+            
         return response.text
     except Exception as e:
         print(f"Error generating summary. Exception type: {type(e)}, Exception: {repr(e)}")
-        return "Failed to generate summary"
+        return f"Failed to generate summary: {str(e)}"
 
 def get_video_summaries(request, video_id):
     if request.method != 'GET':
