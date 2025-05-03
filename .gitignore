@@ -9,3 +9,5 @@
 /frontend/build
 /frontend/public/next.svg
 /frontend/public/favicon.ico
+/backend/videos/
+/backend/users/
