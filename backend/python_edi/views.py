@@ -34,7 +34,7 @@ def editor_view(request):
 class PythonTaskViewSet(viewsets.ModelViewSet):
     queryset = PythonTask.objects.all()
     serializer_class = PythonTaskSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]  # Allow any requests for testing
     
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -121,11 +121,12 @@ def random_task(request):
         )
 
 @api_view(['POST'])
+@permission_classes([permissions.AllowAny])
 def submit_solution(request, task_id):
     """
     Submit a solution for a Python task.
-    This version handles a simplified submission where the client has already checked
-    if the solution is correct based on the single test case.
+    This endpoint checks the solution correctness on the server side.
+    Authentication is disabled for testing
     """
     try:
         task = PythonTask.objects.get(pk=task_id)
@@ -136,42 +137,76 @@ def submit_solution(request, task_id):
         )
     
     code = request.data.get('code')
-    is_correct = request.data.get('is_correct', False)
     
     if not code:
         return Response(
             {"error": "Code is required"},
             status=status.HTTP_400_BAD_REQUEST
         )
+        
+    # Check if task has test cases
+    if not task.test_cases or len(task.test_cases) == 0:
+        return Response(
+            {"error": "No test cases found for this task"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
     
-    # Create submission record
+    # Get test case input
+    test_case = task.test_cases[0]
+    test_input = test_case.get("input", "")
+    expected_output = str(test_case.get("expected_output", "")).strip()
+    
+    # Run the code with test input
+    result = execute_python_code(code, test_input)
+    
+    if not result['success']:
+        # Code execution failed
+        return Response({
+            'success': False,
+            'error': result.get('error', 'Code execution failed'),
+            'submission_id': None
+        })
+    
+    # Check if output matches expected output
+    actual_output = str(result.get('output', '')).strip()
+    is_correct = actual_output == expected_output
+    
+    # Create submission record for authenticated users
+    submission_id = None
     if request.user.is_authenticated:
         submission = Submission.objects.create(
             user=request.user,
             task=task,
             code=code,
             is_successful=is_correct,
-            error_message=None,
+            error_message=None if is_correct else "Output does not match expected output",
             output=json.dumps([{
-                "input": task.test_cases[0]["input"] if task.test_cases else "",
-                "expected_output": task.test_cases[0]["expected_output"] if task.test_cases else "",
+                "input": test_input,
+                "expected_output": expected_output,
+                "actual_output": actual_output,
                 "passed": is_correct
             }])
         )
         submission_id = submission.id
-    else:
-        # For anonymous users, don't save to database
-        submission_id = None
     
+    # Return detailed result information
     return Response({
         'submission_id': submission_id,
-        'success': is_correct
+        'success': is_correct,
+        'details': {
+            'input': test_input,
+            'expected_output': expected_output,
+            'actual_output': actual_output,
+            'passed': is_correct
+        }
     })
 
 @api_view(['POST'])
+@permission_classes([permissions.AllowAny])
 def get_assistance(request, task_id):
     """
     Get AI assistance for a Python task.
+    Authentication is disabled for testing
     """
     try:
         try:
@@ -223,9 +258,11 @@ def get_assistance(request, task_id):
         })
 
 @api_view(['GET'])
+@permission_classes([permissions.AllowAny])
 def get_chat_history(request, task_id):
     """
     Get chat history for a specific task.
+    Authentication is disabled for testing
     """
     try:
         task = PythonTask.objects.get(pk=task_id)
