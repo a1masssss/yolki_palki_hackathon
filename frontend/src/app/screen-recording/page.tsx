@@ -1,31 +1,37 @@
-"use client"
+"use client";
 
-import { useState, useRef, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Camera, StopCircle, MessageSquare, FileText, HelpCircle } from "lucide-react"
-import Link from "next/link"
-import ChatInterface from "@/components/chat-interface"
-import AIGeneratedContent from "@/components/ai-generated-content"
+import { useState, useRef, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Camera,
+  StopCircle,
+  MessageSquare,
+  FileText,
+  HelpCircle,
+} from "lucide-react";
+import Link from "next/link";
+import ChatInterface from "@/components/chat-interface";
+import AIGeneratedContent from "@/components/ai-generated-content";
 
 export default function ScreenRecordingPage() {
-  const [isRecording, setIsRecording] = useState(false)
-  const [recordingComplete, setRecordingComplete] = useState(false)
-  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
-  const [recordingTime, setRecordingTime] = useState(0)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const recordedChunksRef = useRef<BlobPart[]>([])
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingComplete, setRecordingComplete] = useState(false);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<BlobPart[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     return () => {
       if (timerRef.current) {
-        clearInterval(timerRef.current)
+        clearInterval(timerRef.current);
       }
-    }
-  }, [])
+    };
+  }, []);
 
   const startRecording = async () => {
     try {
@@ -35,59 +41,61 @@ export default function ScreenRecordingPage() {
           displaySurface: "monitor",
         },
         audio: true,
-      })
+      });
 
-      mediaRecorderRef.current = new MediaRecorder(stream)
+      mediaRecorderRef.current = new MediaRecorder(stream);
 
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          recordedChunksRef.current.push(event.data)
+          recordedChunksRef.current.push(event.data);
         }
-      }
+      };
 
       mediaRecorderRef.current.onstop = () => {
         const blob = new Blob(recordedChunksRef.current, {
           type: "video/webm",
-        })
-        setRecordedBlob(blob)
-        setRecordingComplete(true)
-        setIsRecording(false)
+        });
+        setRecordedBlob(blob);
+        setRecordingComplete(true);
+        setIsRecording(false);
 
         if (videoRef.current) {
-          videoRef.current.src = URL.createObjectURL(blob)
+          videoRef.current.src = URL.createObjectURL(blob);
         }
 
         if (timerRef.current) {
-          clearInterval(timerRef.current)
+          clearInterval(timerRef.current);
         }
 
-        stream.getTracks().forEach((track) => track.stop())
-      }
+        stream.getTracks().forEach((track) => track.stop());
+      };
 
-      mediaRecorderRef.current.start()
-      setIsRecording(true)
-      setRecordingTime(0)
-      recordedChunksRef.current = []
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      recordedChunksRef.current = [];
 
       timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1)
-      }, 1000)
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
     } catch (error) {
-      console.error("Error starting screen recording:", error)
+      console.error("Error starting screen recording:", error);
     }
-  }
+  };
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
+      mediaRecorderRef.current.stop();
     }
-  }
+  };
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
-  }
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4">
@@ -108,7 +116,9 @@ export default function ScreenRecordingPage() {
                     <div className="h-3 w-3 bg-red-500 rounded-full mr-2"></div>
                     <span className="text-red-500 font-medium">Recording</span>
                   </div>
-                  <div className="text-2xl font-mono">{formatTime(recordingTime)}</div>
+                  <div className="text-2xl font-mono">
+                    {formatTime(recordingTime)}
+                  </div>
                 </div>
               ) : (
                 <p className="text-slate-500 dark:text-slate-400 text-center px-4">
@@ -142,7 +152,11 @@ export default function ScreenRecordingPage() {
             <div className="lg:col-span-2">
               <Card className="mb-6">
                 <div className="p-4">
-                  <video ref={videoRef} controls className="w-full rounded-md" />
+                  <video
+                    ref={videoRef}
+                    controls
+                    className="w-full rounded-md"
+                  />
                 </div>
               </Card>
 
@@ -152,7 +166,10 @@ export default function ScreenRecordingPage() {
                     <MessageSquare className="h-4 w-4" />
                     Chat
                   </TabsTrigger>
-                  <TabsTrigger value="summary" className="flex items-center gap-2">
+                  <TabsTrigger
+                    value="summary"
+                    className="flex items-center gap-2"
+                  >
                     <FileText className="h-4 w-4" />
                     AI Content
                   </TabsTrigger>
@@ -173,13 +190,17 @@ export default function ScreenRecordingPage() {
                 <TabsContent value="help">
                   <Card>
                     <div className="p-6">
-                      <h3 className="text-xl font-semibold mb-4">How to Use This Feature</h3>
+                      <h3 className="text-xl font-semibold mb-4">
+                        How to Use This Feature
+                      </h3>
                       <ul className="space-y-3">
                         <li className="flex items-start gap-2">
                           <div className="mt-1 bg-rose-100 dark:bg-rose-900 rounded-full p-1">
                             <Camera className="h-4 w-4 text-rose-500 dark:text-rose-300" />
                           </div>
-                          <span>Record your screen by clicking the Record button</span>
+                          <span>
+                            Record your screen by clicking the Record button
+                          </span>
                         </li>
                         <li className="flex items-start gap-2">
                           <div className="mt-1 bg-slate-100 dark:bg-slate-800 rounded-full p-1">
@@ -191,7 +212,10 @@ export default function ScreenRecordingPage() {
                           <div className="mt-1 bg-emerald-100 dark:bg-emerald-900 rounded-full p-1">
                             <FileText className="h-4 w-4 text-emerald-500 dark:text-emerald-300" />
                           </div>
-                          <span>View AI-generated summaries, quizzes, and presentation slides</span>
+                          <span>
+                            View AI-generated summaries, quizzes, and
+                            presentation slides
+                          </span>
                         </li>
                       </ul>
                     </div>
@@ -203,20 +227,32 @@ export default function ScreenRecordingPage() {
             <div>
               <Card>
                 <div className="p-6">
-                  <h3 className="text-xl font-semibold mb-4">Recording Details</h3>
+                  <h3 className="text-xl font-semibold mb-4">
+                    Recording Details
+                  </h3>
                   <div className="space-y-4">
                     <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Duration</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Duration
+                      </p>
                       <p className="font-medium">{formatTime(recordingTime)}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Size</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Size
+                      </p>
                       <p className="font-medium">
-                        {recordedBlob ? `${(recordedBlob.size / (1024 * 1024)).toFixed(2)} MB` : "Unknown"}
+                        {recordedBlob
+                          ? `${(recordedBlob.size / (1024 * 1024)).toFixed(
+                              2
+                            )} MB`
+                          : "Unknown"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Format</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Format
+                      </p>
                       <p className="font-medium">WebM</p>
                     </div>
                   </div>
@@ -227,8 +263,8 @@ export default function ScreenRecordingPage() {
                       variant="outline"
                       className="w-full"
                       onClick={() => {
-                        setRecordingComplete(false)
-                        setRecordedBlob(null)
+                        setRecordingComplete(false);
+                        setRecordedBlob(null);
                       }}
                     >
                       New Recording
@@ -241,5 +277,5 @@ export default function ScreenRecordingPage() {
         )}
       </div>
     </div>
-  )
+  );
 }
