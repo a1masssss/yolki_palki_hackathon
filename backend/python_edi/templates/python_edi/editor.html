@@ -145,11 +145,18 @@ for i in range(1, 6):
 </div>
 <script>
     let editor;
-    // Get values from data attributes
-    const djangoContext = document.getElementById('django-context');
-    let currentTaskId = djangoContext.dataset.taskId || null;
+    // Initialize context safely using window object
+    window.djangoContext = {
+        taskId: "{% if task_id %}{{ task_id }}{% else %}{% endif %}",
+        taskTitle: "{% if task_title %}{{ task_title }}{% else %}{% endif %}"
+    };
+    
+    // Convert empty strings to null
+    if (!window.djangoContext.taskId) window.djangoContext.taskId = null;
+    if (!window.djangoContext.taskTitle) window.djangoContext.taskTitle = null;
+    
+    let currentTaskId = window.djangoContext.taskId;
     let currentTestCase = null;
-    const taskTitle = djangoContext.dataset.taskTitle || null;
 
     document.addEventListener('DOMContentLoaded', function() {
         // Setup CSRF token handling
@@ -218,8 +225,8 @@ for i in range(1, 6):
             processTask(data, outputContent);
             
             // If the task title was passed from the server, show it in the UI
-            if (taskTitle) {
-                outputContent.textContent = `Loaded task: ${taskTitle}. Continue working on your solution!`;
+            if (window.djangoContext.taskTitle) {
+                outputContent.textContent = `Loaded task: ${window.djangoContext.taskTitle}. Continue working on your solution!`;
             }
         })
         .catch(error => {
@@ -314,6 +321,12 @@ for i in range(1, 6):
         
         outputContent.textContent = 'Running code...';
         
+        // Automatically add main function call if needed
+        let processedCode = code;
+        if (processedCode.includes("def main(") && !processedCode.includes("main(")) {
+            processedCode += "\n\n# Auto-added by the system\ninput_value = input()\nmain(input_value)\n";
+        }
+        
         // Use server-side execution instead of client-side
         fetch('/python-edi/run-code/', {
             method: 'POST',
@@ -321,7 +334,7 @@ for i in range(1, 6):
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
-                code,
+                code: processedCode,
                 input: testInput 
             })
         })
@@ -367,6 +380,12 @@ for i in range(1, 6):
         
         outputContent.textContent = 'Testing your solution against all test cases...';
         
+        // Automatically add main function call if needed
+        let processedCode = code;
+        if (processedCode.includes("def main(") && !processedCode.includes("main(")) {
+            processedCode += "\n\n# Auto-added by the system\ninput_value = input()\nmain(input_value)\n";
+        }
+        
         // Submit the solution to be tested against all test cases
         fetch(`/python-edi/tasks/${currentTaskId}/submit/`, {
             method: 'POST',
@@ -374,7 +393,7 @@ for i in range(1, 6):
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
-                code
+                code: processedCode
             })
         })
         .then(response => response.json())

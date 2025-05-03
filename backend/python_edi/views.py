@@ -9,6 +9,7 @@ from .openai_utils import execute_python_code, get_ai_assistance, get_task_templ
 import json
 from rest_framework import permissions
 import random
+import re
 
 def editor_view(request):
     """
@@ -155,22 +156,57 @@ def submit_solution(request, task_id):
             status=status.HTTP_400_BAD_REQUEST
         )
     
+    # Preprocess the code to handle return statements in main function
+    if "def main(" in code and "return" in code:
+        # Find main function and replace return statements with print statements
+        lines = code.split('\n')
+        in_main_func = False
+        main_indent = ""
+        
+        for i in range(len(lines)):
+            if re.match(r'^\s*def\s+main\s*\(', lines[i]):
+                in_main_func = True
+                # Get the indentation level
+                main_indent = re.match(r'^(\s*)', lines[i]).group(1)
+            elif in_main_func and lines[i].strip() and not lines[i].startswith(main_indent + " "):
+                # End of main function
+                in_main_func = False
+            
+            # Replace return with print in the main function
+            if in_main_func and "return" in lines[i]:
+                # Extract the returned value
+                return_match = re.search(r'return\s+(.*?)(\s*#.*)?$', lines[i])
+                if return_match:
+                    returned_value = return_match.group(1).strip()
+                    # Replace with print statement
+                    indent = re.match(r'^(\s*)', lines[i]).group(1)
+                    lines[i] = f"{indent}print(str({returned_value}))  # Auto-converted return"
+        
+        code = '\n'.join(lines)
+    
     # Test the solution against all test cases
     test_results = []
     all_passed = True
+    execution_error = None
     
     for i, test_case in enumerate(task.test_cases):
         test_input = test_case.get("input", "")
         expected_output = str(test_case.get("expected_output", "")).strip()
         
+        # Ensure code is automatically run with the test input
+        processed_code = code
+        if "def main(" in processed_code and "main(" not in processed_code.split("def main(")[1]:
+            processed_code += "\n\n# Auto-added by the system\ninput_value = input()\nmain(input_value)\n"
+        
         # Run the code with test input
-        result = execute_python_code(code, test_input)
+        result = execute_python_code(processed_code, test_input)
         
         if not result['success']:
             # Code execution failed
+            execution_error = result.get('error', 'Code execution failed')
             return Response({
                 'success': False,
-                'error': result.get('error', 'Code execution failed'),
+                'error': execution_error,
                 'submission_id': None
             })
         
@@ -197,7 +233,7 @@ def submit_solution(request, task_id):
             task=task,
             code=code,
             is_successful=all_passed,
-            error_message=None if all_passed else "One or more test cases failed",
+            error_message=execution_error if execution_error else None if all_passed else "One or more test cases failed",
             output=json.dumps(test_results)
         )
         submission_id = submission.id
@@ -311,7 +347,42 @@ def run_code(request):
         # Get optional input data
         input_data = request.data.get('input', '')
         
-        # Execute the code with Judge0 API
+        # Preprocess the code to handle return statements in main function
+        if "def main(" in code and "return" in code:
+            # Find main function and replace return statements with print statements
+            lines = code.split('\n')
+            in_main_func = False
+            main_indent = ""
+            
+            for i in range(len(lines)):
+                if re.match(r'^\s*def\s+main\s*\(', lines[i]):
+                    in_main_func = True
+                    # Get the indentation level
+                    main_indent = re.match(r'^(\s*)', lines[i]).group(1)
+                elif in_main_func and lines[i].strip() and not lines[i].startswith(main_indent + " "):
+                    # End of main function
+                    in_main_func = False
+                
+                # Replace return with print in the main function
+                if in_main_func and "return" in lines[i]:
+                    # Extract the returned value
+                    return_match = re.search(r'return\s+(.*?)(\s*#.*)?$', lines[i])
+                    if return_match:
+                        returned_value = return_match.group(1).strip()
+                        # Replace with print statement
+                        indent = re.match(r'^(\s*)', lines[i]).group(1)
+                        lines[i] = f"{indent}print(str({returned_value}))  # Auto-converted return"
+            
+            code = '\n'.join(lines)
+        
+        # Ensure code is automatically run even if there's no explicit call
+        # Check if code includes a main function but doesn't call it
+        if "def main(" in code and "main(" not in code.split("def main(")[1]:
+            code += "\n\n# Auto-added by the system\ninput_value = input()\nmain(input_value)\n"
+        elif "def main():" in code and "main()" not in code.split("def main():")[1]:
+            code += "\n\n# Auto-added by the system\nmain()\n"
+        
+        # Execute the code
         result = execute_python_code(code, input_data)
         
         if result['success']:

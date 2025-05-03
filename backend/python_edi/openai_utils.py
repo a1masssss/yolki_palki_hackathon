@@ -2,6 +2,7 @@ import requests
 import json
 import os
 from django.conf import settings
+import re
 
 def execute_python_code(code, test_input=None):
     """
@@ -38,7 +39,7 @@ def process_code_locally(code, test_input=None):
         
         # Create a safe environment that captures print output
         safe_globals = {
-            'print': lambda *args: captured_output.append(' '.join(str(arg) for arg in args)),
+            'print': lambda *args, **kwargs: captured_output.append(' '.join(map(lambda x: str(x).replace('%', '%%'), args))),
             'input': lambda prompt=None: str(test_input) if test_input else '',
             # Safe math operations
             'len': len,
@@ -70,15 +71,19 @@ def process_code_locally(code, test_input=None):
         # Pre-process code to ensure proper output
         original_code = code
         
-        # Check if code includes a main function but doesn't call it
-        if "def main():" in code and "if __name__ == \"__main__\":" not in code:
-            code += "\n\n# Auto-added by the system\nif __name__ == \"__main__\":\n    main()"
+        # Check if code includes a main function with parameters but doesn't call it
+        if "def main(" in code and "main(" not in code.split("def main(")[1]:
+            # Auto-add the main function call with the input
+            code += "\n\n# Auto-added by the system\ninput_value = input()\nmain(input_value)\n"
         
-        # Check if code has function named 'solution' but doesn't call it
-        if "def solution(" in code and "solution(" not in code.split("def solution(")[1]:
+        # For backwards compatibility: check if code includes a main function without parameters
+        elif "def main():" in code and "main()" not in code.split("def main():")[1]:
+            code += "\n\n# Auto-added by the system\nmain()\n"
+            
+        # For backwards compatibility: check if code has function named 'solution' but doesn't call it
+        elif "def solution(" in code and "solution(" not in code.split("def solution(")[1]:
             # Add code to call solution with test input
-            if "if __name__ == \"__main__\":" not in code:
-                code += "\n\n# Auto-added by the system\nresult = solution(input())\nprint(result)"
+            code += "\n\n# Auto-added by the system\ninput_value = input()\nresult = solution(input_value)\nprint(result)\n"
         
         # Handle specific code patterns for common tasks first
         if "add_numbers" in code and test_input and ',' in str(test_input):
@@ -142,7 +147,9 @@ def process_code_locally(code, test_input=None):
             # Special allowlist for common patterns
             allowed_patterns = [
                 'if __name__ == "__main__":', 'if __name__ == \'__main__\':', 
-                'def __init__', '__str__', '__repr__'
+                'def __init__', '__str__', '__repr__',
+                '# Auto-converted from',  # Allow in our auto-generated comments
+                '# Converted from'        # Allow in our auto-generated comments
             ]
             
             # Check if code contains dangerous patterns but not in allowed patterns
@@ -154,6 +161,12 @@ def process_code_locally(code, test_input=None):
                         if allowed_pattern in code and pattern in allowed_pattern:
                             is_allowed = True
                             break
+                    
+                    # Special case for "from" used in variables (not imports)
+                    if pattern == 'from' and not re.search(r'from\s+[\w\.]+\s+import', code):
+                        # Check if it's just a variable name containing "from"
+                        if re.search(r'\bfrom_\w+\b', code) or not re.search(r'\bfrom\s+', code):
+                            is_allowed = True
                     
                     if not is_allowed:
                         return {
@@ -331,16 +344,14 @@ def get_task_template(task_title, task_description=None, test_cases=None):
     Return a code template based on task title and input format.
     This helps students by providing a starting point with proper structure.
     """
-    # Default template for any task
+    # Default template using main() function instead of solution()
     default_template = """# Write your solution here
-def solution(input_data):
+def main(input_data):
     # Your code here
-    return 0  # Replace with your solution
+    result = 0  # Replace with your solution
+    print(str(result))  # Convert result to string before printing
 
-# Test with input
-input_value = input()
-result = solution(input_value)
-print(result)
+# Do not modify below this line - the system will auto-run your code
 """
 
     # Try to detect if we have multiple inputs based on test cases or description
@@ -365,42 +376,35 @@ print(result)
     if "sum" in task_title.lower() or "add" in task_title.lower():
         if has_multiple_inputs:
             return """# Add two numbers
-def solution(input_data):
+def main(input_data):
     # Parse input (comma-separated values)
     values = [int(x.strip()) for x in input_data.split(',')]
     
     # Calculate the sum
     result = sum(values)  # or values[0] + values[1] for specifically two numbers
-    
-    return result
+    print(str(result))  # Convert result to string before printing
 
-# Test with input
-input_value = input()
-result = solution(input_value)
-print(result)
+# Do not modify below this line - the system will auto-run your code
 """
     
     if "average" in task_title.lower() or "mean" in task_title.lower():
         return """# Calculate Average
-def solution(input_data):
+def main(input_data):
     # Parse input (comma-separated values)
     values = [int(x.strip()) for x in input_data.split(',')]
     
     # Calculate the average
     average = sum(values) / len(values)
     
-    # Return the result (rounded to nearest integer)
-    return round(average)
+    # Print the result (rounded to nearest integer)
+    print(str(round(average)))  # Convert to string before printing
 
-# Test with input
-input_value = input()
-result = solution(input_value)
-print(result)
+# Do not modify below this line - the system will auto-run your code
 """
     
     if "count" in task_title.lower() and ("vowel" in task_title.lower() or "vowels" in task_title.lower()):
         return """# Count Vowels in a String
-def solution(input_data):
+def main(input_data):
     # Define the vowels
     vowels = "aeiou"
     
@@ -410,61 +414,52 @@ def solution(input_data):
         if char in vowels:
             count += 1
     
-    return count
+    print(str(count))  # Convert to string before printing
 
-# Test with input
-input_value = input()
-result = solution(input_value)
-print(result)
+# Do not modify below this line - the system will auto-run your code
 """
     
     if "even" in task_title.lower() and "odd" in task_title.lower():
         return """# Even or Odd Number
-def solution(input_data):
+def main(input_data):
     # Convert input to integer
     num = int(input_data)
     
     # Check if even or odd (1 for even, 0 for odd)
-    return 1 if num % 2 == 0 else 0
+    # Make sure to print a simple integer value
+    if num % 2 == 0:
+        print("1")
+    else:
+        print("0")
 
-# Test with input
-input_value = input()
-result = solution(input_value)
-print(result)
+# Do not modify below this line - the system will auto-run your code
 """
     
     # For other task types, generate a template based on input format
     if has_multiple_inputs:
         return """# {}
-def solution(input_data):
+def main(input_data):
     # Parse input (comma-separated values)
     values = [int(x.strip()) for x in input_data.split(',')]
     
     # Your solution logic here
     result = 0  # Replace with your solution
-    
-    return result
+    print(str(result))  # Convert to string before printing
 
-# Test with input
-input_value = input()
-result = solution(input_value)
-print(result)
+# Do not modify below this line - the system will auto-run your code
 """.format(task_title)
     
     # Default fallback for any other case
     return """# {}
-def solution(input_data):
+def main(input_data):
     # Process the input
     # Your code here
     
-    # Return the result
+    # Calculate and print the result
     result = 0  # Replace with your solution
-    return result
+    print(str(result))  # Convert to string before printing
 
-# Test with input
-input_value = input()
-result = solution(input_value)
-print(result)
+# Do not modify below this line - the system will auto-run your code
 """.format(task_title)
 
 def generate_python_task(difficulty='easy'):
