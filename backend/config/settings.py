@@ -24,7 +24,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-issrzw&^$!jj5uldn%gdxf6n@4edz4^=251l1k69*8ekdhm!=v'
-OPEN_API_KEY = os.getenv('OPEN_API_KEY')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+JUDGE0_API_KEY = os.getenv('JUDGE0_API_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -47,11 +48,17 @@ INSTALLED_APPS = [
     'main', 
     'media_recorder', 
     'users',
+    'python_edi',
+
+    'rest_framework',
+    'corsheaders',
+    'drf_yasg',
 ]
 
 CRISPY_TEMPLATE_PACK = 'bootstrap5'
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware', 
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -143,3 +150,29 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Set the custom User model
 AUTH_USER_MODEL = 'users.User'
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+}
+
+# CORS settings
+CORS_ALLOW_ALL_ORIGINS = True  # For development only, limit this in production
+CORS_ALLOW_CREDENTIALS = True  # Allow cookies to be sent with requests
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# CSRF settings
+CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'http://localhost:8001', 'http://127.0.0.1:8000', 'http://127.0.0.1:8001']
