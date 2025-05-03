@@ -113,10 +113,10 @@ export default function PythonEDIPage() {
 
       // Call the API to run the code
       const response = await axios.post(
-        "http://127.0.0.1:8000/python-edi/run-code/",
+        "http://127.0.0.1:8000/python-edi/tasks/submit/",
         {
           code: code,
-          input: input,
+          task: currentTask,
         }
       );
 

@@ -127,15 +127,15 @@ def random_task(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
-def submit_solution(request, task_id):
+def submit_solution(request):
     """
     Submit a solution for a Python task.
     This endpoint checks the solution correctness on all test cases.
     Authentication is disabled for testing
     """
     try:
-        task = PythonTask.objects.get(pk=task_id)
-        
+        task = request.data.get('task')
+
     except PythonTask.DoesNotExist:
         return Response(
             {"error": "Task not found"},
@@ -151,7 +151,7 @@ def submit_solution(request, task_id):
         )
         
     # Check if task has test cases
-    if not task.test_cases or len(task.test_cases) == 0:
+    if not task.get('testCases') or len(task.get('testCases', [])) == 0:
         return Response(
             {"error": "No test cases found for this task"},
             status=status.HTTP_400_BAD_REQUEST
@@ -190,9 +190,15 @@ def submit_solution(request, task_id):
     all_passed = True
     execution_error = None
     
-    for i, test_case in enumerate(task.test_cases):
-        test_input = test_case.get("input", "")
-        expected_output = str(test_case.get("expected_output", "")).strip()
+    for i, test_case in enumerate(task.get('testCases')):
+        test_input = test_case.get('input', None)
+        expected_output = test_case.get('expectedOutput', None)
+
+        if test_input is None:
+            print("Test input is None")
+
+        if expected_output is None:
+            print("Expected output is None")
         
         # Ensure code is automatically run with the test input
         processed_code = code
