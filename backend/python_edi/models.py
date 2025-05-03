@@ -29,6 +29,7 @@ class PythonTask(models.Model):
     ], default='easy')
     expected_output = models.TextField(blank=True, null=True)
     test_cases = models.JSONField(default=list, help_text="List of dictionaries with 'input' and 'expected_output' keys")
+    hints = models.JSONField(default=list, help_text="List of hints for the task, in increasing order of helpfulness")
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
