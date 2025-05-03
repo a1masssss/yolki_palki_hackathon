@@ -3,122 +3,59 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Play, Save, Trash, Code, Copy, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import CodeEditor from "@/components/code-editor";
 import ChatAssistance from "@/components/chat-assistance";
 import HintsSection from "@/components/hints-section";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import TaskGenerator from "@/components/task-generator";
+import AISolutionGenerator from "@/components/ai-solution-generator";
+import axios from "axios";
 
-const initialCode = `# Welcome to the Python EDI
-# Try running this sample code
-
-def greet(name):
-    return f"Hello, {name}!"
-
-result = greet("World")
-print(result)
-
-for i in range(1, 6):
-    print(f"{i} squared is {i**2}")
+// Sample Python code for initial editor content
+const initialCode = `def main(input):
+    # Your code here
 `;
-
-const mockExecutePython = (code: string): string => {
-  let output = "";
-  const printRegex = /print$$(.*?)$$/g;
-  const printMatches = code.match(printRegex);
-
-  if (printMatches) {
-    printMatches.forEach((match) => {
-      try {
-        const content = match.substring(6, match.length - 1);
-
-        if (
-          (content.startsWith('"') && content.endsWith('"')) ||
-          (content.startsWith("'") && content.endsWith("'"))
-        ) {
-          output += content.substring(1, content.length - 1) + "\n";
-        } else if (content.startsWith('f"') || content.startsWith("f'")) {
-          const fStringContent = content.substring(2, content.length - 1);
-
-          if (fStringContent.includes("{") && fStringContent.includes("}")) {
-            if (
-              (fStringContent.includes("{name}") &&
-                code.includes('name = "World"')) ||
-              code.includes("name = 'World'")
-            ) {
-              output += fStringContent.replace("{name}", "World") + "\n";
-            } else if (
-              fStringContent.includes("{i}") &&
-              fStringContent.includes("{i**2}")
-            ) {
-              for (let i = 1; i <= 5; i++) {
-                output +=
-                  fStringContent
-                    .replace("{i}", i.toString())
-                    .replace("{i**2}", (i * i).toString()) + "\n";
-              }
-            } else {
-              output += "Hello, World!\n";
-            }
-          } else {
-            output += fStringContent + "\n";
-          }
-        } else {
-          if (content === '"Hello, World!"' || content === "'Hello, World!'") {
-            output += "Hello, World!\n";
-          } else if (content === "result") {
-            output += "Hello, World!\n";
-          } else {
-            output += "Expression result\n";
-          }
-        }
-      } catch (e) {
-        output += "Error evaluating print statement\n";
-      }
-    });
-  }
-
-  if (!output) {
-    if (code.includes("def greet") && code.includes("Hello")) {
-      output = "Hello, World!\n";
-      output += "1 squared is 1\n";
-      output += "2 squared is 4\n";
-      output += "3 squared is 9\n";
-      output += "4 squared is 16\n";
-      output += "5 squared is 25\n";
-    } else {
-      output = "Code executed successfully, but no output was generated.\n";
-      output += "Add print() statements to see output here.";
-    }
-  }
-
-  return output;
-};
 
 export default function PythonEDIPage() {
   const [code, setCode] = useState(initialCode);
   const [output, setOutput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [showPyodideWarning, setShowPyodideWarning] = useState(true);
+  const [currentTask, setCurrentTask] = useState<{
+    title: string;
+    description: string;
+    startingCode: string;
+  } | null>(null);
 
   useEffect(() => {
+    // Set initial message
     setOutput(
       "Python interpreter simulation ready. Note: This is a simplified demonstration."
     );
   }, []);
+
+  const handleSelectTask = (task: any) => {
+    setCurrentTask(task);
+    setCode(task.startingCode);
+    setOutput("");
+  };
 
   const runCode = async () => {
     setIsRunning(true);
     setOutput("Running...");
 
     try {
+      // Use the mock execution function
       setTimeout(() => {
-        const result = mockExecutePython(code);
+        const result = axios.post("http://127.0.0.1:8000/python-edi/run-code/", {
+          code: code,
+          input: currentTask?.testCases[0].input,
+        });
+        
         setOutput(result);
         setIsRunning(false);
-      }, 500);
+      }, 500); // Add a small delay to simulate processing
     } catch (error) {
       console.error("Python execution error:", error);
       setOutput(
@@ -149,12 +86,22 @@ export default function PythonEDIPage() {
           </Link>
         </div>
 
-        <ResizablePanelGroup
-          direction="horizontal"
-          className="min-h-[80vh] rounded-lg border"
-        >
-          <ResizablePanel defaultSize={50} minSize={30}>
-            <div className="h-full flex flex-col">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left column - Task Generator */}
+          <div className="lg:col-span-1 space-y-6">
+            <TaskGenerator onSelectTask={handleSelectTask} />
+            {currentTask && (
+              <AISolutionGenerator
+                taskTitle={currentTask.title}
+                taskDescription={currentTask.description}
+              />
+            )}
+          </div>
+
+          {/* Right column - Editor and Output */}
+          <div className="lg:col-span-2 flex flex-col space-y-6">
+            {/* Code Editor */}
+            <div className="border rounded-lg overflow-hidden flex flex-col h-[50vh]">
               <div className="bg-slate-100 dark:bg-slate-800 p-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Code className="h-5 w-5 text-emerald-500" />
@@ -199,15 +146,13 @@ export default function PythonEDIPage() {
                 </Button>
               </div>
             </div>
-          </ResizablePanel>
 
-          <ResizablePanel defaultSize={50}>
-            <div className="h-full flex flex-col">
+            {/* Output Tabs */}
+            <div className="border rounded-lg overflow-hidden h-[30vh]">
               <Tabs defaultValue="output" className="h-full flex flex-col">
                 <TabsList className="mx-4 mt-2">
                   <TabsTrigger value="output">Output</TabsTrigger>
                   <TabsTrigger value="chat">Chat Assistance</TabsTrigger>
-                  <TabsTrigger value="hints">Hints</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="output" className="flex-grow p-0 m-0">
@@ -221,14 +166,10 @@ export default function PythonEDIPage() {
                 <TabsContent value="chat" className="flex-grow p-0 m-0">
                   <ChatAssistance code={code} />
                 </TabsContent>
-
-                <TabsContent value="hints" className="flex-grow p-0 m-0">
-                  <HintsSection code={code} />
-                </TabsContent>
               </Tabs>
             </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          </div>
+        </div>
       </div>
     </div>
   );

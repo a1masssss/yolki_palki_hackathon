@@ -15,8 +15,6 @@ client = genai.Client(
     http_options=types.HttpOptions(api_version='v1alpha')
 )
 
-model = client.models.get('gemini-1.5-flash')
-
 @csrf_exempt
 def upload_video(request):
     if request.method == 'POST':
@@ -56,46 +54,38 @@ def process_video(video_id):
             '-c:a', 'aac', mp4_path
         ])
         
-        # Get video duration using ffprobe
         duration_cmd = [
             'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
             '-of', 'default=noprint_wrappers=1:nokey=1', mp4_path
         ]
         duration = float(subprocess.check_output(duration_cmd).decode('utf-8').strip())
         
-        # Calculate number of segments (60 seconds each)
         segment_duration = 60
         num_segments = int(duration / segment_duration) + (1 if duration % segment_duration > 0 else 0)
         
         for segment in range(num_segments):
             start_time = segment * segment_duration
             
-            # For the last segment, calculate the remaining duration
             if segment == num_segments - 1 and duration % segment_duration > 0:
                 segment_length = duration % segment_duration
             else:
                 segment_length = segment_duration
                 
-            # Generate segment file path
             segment_path = os.path.join(temp_dir, f'segment_{segment}.mp4')
             
-            # Use ffmpeg to extract the segment
             subprocess.run([
                 'ffmpeg', '-i', mp4_path, '-ss', str(start_time),
                 '-t', str(segment_length), '-c:v', 'copy', '-c:a', 'copy',
                 segment_path
             ])
             
-            # Generate a simple text summary based on segment number and timestamp
             summary = f"Video segment {segment+1} (from {start_time}s to {start_time + segment_length}s)"
             
-            # Read the segment file as binary data
             with open(segment_path, 'rb') as video_file:
                 segment_data = video_file.read()
                 
                 filename = f'segment_{video_id}_{segment}.mp4'
                 
-                # Save to database
                 summary_obj = VideoSummary(
                     video=video_record,
                     timestamp=int(start_time),
@@ -108,20 +98,20 @@ def process_video(video_id):
 def get_gemini_summary(video_path):
     try:
         prompt = (
-            "Analyze this screenshot as a digital learning environment. "
-            "Focus only on meaningful textual or visual learning content.\n\n"
-            "Do not describe UI elements such as browser tabs, toolbars, buttons, "
-            "or menus unless they directly display important content.\n\n"
-            "Your response must be in the form of bullet points only. Each bullet "
-            "should summarize one piece of relevant information.\n\n"
-            "Include bullet points for:\n\n"
-            "Content from any visible PDF (e.g., textbook pages, research articles, assignments)\n\n"
-            "Content from a Jupyter notebook (.ipynb) (e.g., code cells, output, markdown explanations)\n\n"
-            "Content from any video (type and topic of the video, based on visible frame or captions)\n\n"
-            "Any readable text on screen (e.g., article excerpts, notes, code comments, subtitles)\n\n"
-            "Any other important visual or textual learning material\n\n"
-            "End with a brief set of bullet points summarizing what the user is most likely studying or working on, "
-            "based on all visible content."
+            "Summarize this 45-second screen recording for study purposes:\n\n"
+            "1. Start by identifying what's it about: \"The screen shows e.g. PDF, jupyter notebook, video, movie, etc.\"\n\n"
+            "2. Extract only what's meaningful:\n"
+            "   - Focus on content visible for 5+ seconds\n"
+            "   - Capture key concepts, terms, and core information\n"
+            "   - Note any content that receives special emphasis or repetition\n"
+            "   - Document any mathematical expressions, technical formulas, or programming syntax\n"
+            "   - Describe significant visual elements or diagrams concisely\n\n"
+            "3. Deliberately omit:\n"
+            "   - Fleeting information or rapidly changing screens\n"
+            "   - Peripheral details not central to the main topic\n\n"
+            "4. Provide minimal contextual framing if the segment appears to be part of a broader subject\n\n"
+            "5. Prioritize information with highest educational value\n\n"
+            "Format your summary in a clear, structured manner optimized for retention and review."
         )
 
         file = client.files.upload(file=video_path)
@@ -139,7 +129,6 @@ def get_gemini_summary(video_path):
         return "Failed to generate summary"
 
 def get_video_summaries(request, video_id):
-    # Only allow GET requests
     if request.method != 'GET':
         return JsonResponse({'error': 'Only GET requests are allowed'}, status=405)
         
