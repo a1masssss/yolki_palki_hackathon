@@ -1,0 +1,15 @@
+asgiref==3.8.1
+crispy-bootstrap5==2025.4
+Django==5.2
+sqlparse==0.5.3
+django-crispy-forms>=2.0
+crispy-bootstrap5>=0.7
+google-generativeai>=0.3.0
+opencv-python>=4.8.0
+Pillow>=10.0.0
+python-dotenv>=1.0.0
+psycopg2-binary>=2.9.6
+ffmpeg-python>=0.2.0
+google-genai>=0.3.0
+git-filter-repo==2.47.0
+python-dotenv==1.1.0

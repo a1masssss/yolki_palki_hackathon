@@ -202,6 +202,11 @@ for i in range(1, 6):
         if (currentTaskId) {
             loadTaskById(currentTaskId);
         }
+
+        // Set up the "Hint" tab to load hints when clicked
+        document.getElementById('hints-tab').addEventListener('click', function() {
+            loadHints();
+        });
     });
     
     // Function to load a specific task by ID
@@ -400,6 +405,11 @@ for i in range(1, 6):
         .then(data => {
             if (data.error) {
                 outputContent.textContent = `Error executing your code: ${data.error}`;
+                // Show hint tab when there's an error
+                if (!data.success) {
+                    document.getElementById('hints-tab').click();
+                    loadHints();
+                }
                 return;
             }
             
@@ -408,6 +418,9 @@ for i in range(1, 6):
                 outputContent.textContent = 'Congratulations! All test cases passed!\n\n';
             } else {
                 outputContent.textContent = 'Not solved. One or more test cases failed.\n\n';
+                // Show hint tab when there's a failure
+                document.getElementById('hints-tab').click();
+                loadHints();
             }
             
             // Display detailed results for each test case
@@ -425,6 +438,77 @@ for i in range(1, 6):
             console.error('Error checking solution:', error);
             outputContent.textContent = 'Error checking your solution: ' + error.message;
         });
+    }
+
+    // Track current hint index
+    let currentHintIndex = 0;
+    let totalHints = 0;
+    let hintsList = [];
+
+    // Function to load hints
+    function loadHints() {
+        if (!currentTaskId) {
+            document.getElementById('hintsContent').textContent = 'Please get a task first.';
+            return;
+        }
+        
+        const hintsContent = document.getElementById('hintsContent');
+        hintsContent.textContent = 'Loading hints...';
+        
+        fetch(`/python-edi/tasks/${currentTaskId}/hints/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                hintsContent.textContent = `Error: ${data.error}`;
+                return;
+            }
+            
+            hintsList = data.hints;
+            totalHints = data.total_hints;
+            currentHintIndex = 0;
+            
+            if (totalHints === 0) {
+                hintsContent.textContent = 'No hints available for this task.';
+                return;
+            }
+            
+            showCurrentHint();
+        })
+        .catch(error => {
+            console.error('Error loading hints:', error);
+            hintsContent.textContent = 'Error loading hints: ' + error.message;
+        });
+    }
+    
+    // Function to show current hint
+    function showCurrentHint() {
+        const hintsContent = document.getElementById('hintsContent');
+        if (currentHintIndex < totalHints) {
+            hintsContent.innerHTML = `
+                <div class="alert alert-info">
+                    <strong>Hint ${currentHintIndex + 1}/${totalHints}:</strong><br>
+                    ${hintsList[currentHintIndex]}
+                </div>
+                <div class="text-center mt-3">
+                    <button id="nextHintBtn" class="btn btn-sm btn-outline-primary" onclick="showNextHint()">
+                        ${currentHintIndex < totalHints - 1 ? 'Show Next Hint' : 'Restart Hints'}
+                    </button>
+                </div>
+            `;
+        } else {
+            // Reset to first hint if we've gone through all hints
+            currentHintIndex = 0;
+            showCurrentHint();
+        }
+    }
+    
+    // Function to show next hint
+    function showNextHint() {
+        currentHintIndex++;
+        if (currentHintIndex >= totalHints) {
+            currentHintIndex = 0; // Loop back to first hint
+        }
+        showCurrentHint();
     }
 
     // Function to send a message for assistance
