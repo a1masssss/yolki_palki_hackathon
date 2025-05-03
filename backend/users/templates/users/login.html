@@ -27,14 +27,37 @@
 
                     <form method="POST">
                         {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger" role="alert">
+                            {% for error in form.non_field_errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
                         <div class="mb-3">
                             {{ form.username }}
+                            {% if form.username.errors %}
+                            <div class="text-danger">
+                                {% for error in form.username.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                         </div>
                         <div class="mb-3 position-relative">
                             {{ form.password }}
                             <button type="button" class="btn border-0 position-absolute" id="togglePassword" style="right: 10px; top: 50%; transform: translateY(-50%); background: none;">
                                 <i class="bi bi-eye-slash"></i>
                             </button>
+                            {% if form.password.errors %}
+                            <div class="text-danger">
+                                {% for error in form.password.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                         </div>
 
                         <button type="submit" class="btn btn-primary rounded-pill w-100">Login</button>
