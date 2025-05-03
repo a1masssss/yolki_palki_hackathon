@@ -39,7 +39,10 @@ urlpatterns = [
     path('main/', include('main.urls')),
     path('users/', include('users.urls')),
     path('python-edi/', include('python_edi.urls')),
-    path('media/', include('media_recorder.urls')),
+    # Temporarily disabled until Gemini API keys are configured
+    # path('media/', include('media_recorder.urls')),
+    
+    # Swagger URLs
     path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),

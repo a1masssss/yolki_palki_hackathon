@@ -149,47 +149,45 @@ def process_code_locally(code, test_input=None):
                     "error": "Code contains too many loops (maximum 10)"
                 }
             
-            # Add timeout for code execution
-            import signal
+            # Use a thread with a timeout instead of signals which don't work well in threads
+            import threading
+            import time
             
-            class TimeoutException(Exception):
-                pass
+            execution_result = {
+                "success": False,
+                "output": None,
+                "error": "Execution timed out"
+            }
             
-            def timeout_handler(signum, frame):
-                raise TimeoutException("Code execution timed out")
+            def execute_code():
+                try:
+                    exec(code, safe_globals, local_vars)
+                    execution_result["success"] = True
+                    execution_result["output"] = '\n'.join(captured_output) or "Code executed successfully, but no output was produced."
+                    execution_result["error"] = None
+                except Exception as e:
+                    execution_result["success"] = False
+                    execution_result["output"] = None
+                    execution_result["error"] = f"Error executing code: {str(e)}"
             
-            # Set a 2-second timeout
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(2)
+            execution_thread = threading.Thread(target=execute_code)
+            execution_thread.daemon = True
             
-            try:
-                # Execute the code in a restricted environment
-                exec(code, safe_globals, local_vars)
-                
-                # Cancel the alarm if code finishes within the time limit
-                signal.alarm(0)
-                
-                # Return the captured output
-                return {
-                    "success": True,
-                    "output": '\n'.join(captured_output) or "Code executed successfully, but no output was produced.",
-                    "error": None
-                }
-            except TimeoutException as e:
+            # Start execution
+            execution_thread.start()
+            
+            # Wait for completion with timeout
+            execution_thread.join(2.0)  # 2 second timeout
+            
+            # Check if thread is still alive (timed out)
+            if execution_thread.is_alive():
                 return {
                     "success": False,
                     "output": None,
-                    "error": f"Error executing code: {str(e)}"
+                    "error": "Code execution timed out after 2 seconds"
                 }
-            except Exception as e:
-                return {
-                    "success": False,
-                    "output": None,
-                    "error": f"Error executing code: {str(e)}"
-                }
-            finally:
-                # Ensure alarm is cancelled
-                signal.alarm(0)
+                
+            return execution_result
                 
         except Exception as e:
             return {
