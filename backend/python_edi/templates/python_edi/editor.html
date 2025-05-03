@@ -1,0 +1,635 @@
+{% extends 'main/base.html' %}
+{% load static %}
+
+{% block title %}Python EDI Module{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>Python EDI Module</h1>
+            <a href="{% url 'home' %}" class="btn btn-outline-secondary float-end">Back to Home</a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left panel: Task description and selection -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 id="taskTitle">Task</h4>
+                </div>
+                <div class="card-body">
+                    <div id="taskDescription">
+                        <p>Choose whether to get a random task from the database or generate a new one.</p>
+                    </div>
+                    <div class="mt-3">
+                        <button id="generateTaskBtn" class="btn btn-primary">Generate New Task</button>
+                        <button id="randomTaskBtn" class="btn btn-secondary ms-2">Get Random Task</button>
+                        <div class="form-check form-check-inline ms-2 mt-2">
+                            <input class="form-check-input" type="radio" name="difficulty" id="difficultyEasy" value="easy" checked>
+                            <label class="form-check-label" for="difficultyEasy">Easy</label>
+                        </div>
+                        <div class="form-check form-check-inline mt-2">
+                            <input class="form-check-input" type="radio" name="difficulty" id="difficultyMedium" value="medium">
+                            <label class="form-check-label" for="difficultyMedium">Medium</label>
+                        </div>
+                        <div class="form-check form-check-inline mt-2">
+                            <input class="form-check-input" type="radio" name="difficulty" id="difficultyHard" value="hard">
+                            <label class="form-check-label" for="difficultyHard">Hard</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat section -->
+            <div class="card">
+                <div class="card-header">
+                    <h4>AI Assistance</h4>
+                </div>
+                <div class="card-body">
+                    <div id="chatMessages" class="mb-3" style="height: 300px; overflow-y: auto;"></div>
+                    <div class="input-group">
+                        <input type="text" id="userMessage" class="form-control" placeholder="Ask for help...">
+                        <button id="sendMessageBtn" class="btn btn-primary">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right panel: Code editor and output -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4>Python Editor</h4>
+                    <div>
+                        <button id="copyCodeBtn" class="btn btn-outline-secondary btn-sm me-2">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                        <button id="clearCodeBtn" class="btn btn-outline-danger btn-sm">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="editor" style="height: 400px; width: 100%;">
+# Welcome to the Python EDI
+# Try running this sample code
+
+def greet(name):
+    return f"Hello, {name}!"
+
+result = greet("World")
+print(result)
+
+for i in range(1, 6):
+    print(f"{i} squared is {i**2}")
+                    </div>
+                    <div class="mt-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <input type="text" id="testInput" class="form-control mb-2" placeholder="Test input (optional)">
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <button id="runCodeBtn" class="btn btn-success me-2">Run Code</button>
+                                <button id="submitCodeBtn" class="btn btn-primary">Submit Solution</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" id="outputTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="output-tab" data-bs-toggle="tab" data-bs-target="#output" type="button" role="tab" aria-controls="output" aria-selected="true">Output</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chatHelp" type="button" role="tab" aria-controls="chatHelp" aria-selected="false">Chat Assistance</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="hints-tab" data-bs-toggle="tab" data-bs-target="#hints" type="button" role="tab" aria-controls="hints" aria-selected="false">Hints</button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content" id="outputTabsContent">
+                        <div class="tab-pane fade show active" id="output" role="tabpanel" aria-labelledby="output-tab">
+                            <pre id="outputContent" class="p-3 bg-dark text-light" style="height: 200px; overflow-y: auto;">Python interpreter simulation ready. Note: This is a simplified demonstration.</pre>
+                        </div>
+                        <div class="tab-pane fade" id="chatHelp" role="tabpanel" aria-labelledby="chat-tab">
+                            <div id="chatOutput" class="p-3" style="height: 200px; overflow-y: auto;">
+                                <p>Need help? Use the chat assistance panel to ask questions about your code.</p>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="hints" role="tabpanel" aria-labelledby="hints-tab">
+                            <div id="hintsContent" class="p-3" style="height: 200px; overflow-y: auto;">
+                                <p>Hints will appear here after you've made a few attempts.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+<!-- Store Django context variables in HTML data attributes -->
+<div id="django-context" 
+     data-task-id="{% if task_id %}{{ task_id }}{% else %}{% endif %}" 
+     data-task-title="{% if task_title %}{{ task_title }}{% else %}{% endif %}"
+     style="display: none;">
+</div>
+<script>
+    let editor;
+    // Get values from data attributes
+    const djangoContext = document.getElementById('django-context');
+    let currentTaskId = djangoContext.dataset.taskId || null;
+    let currentTestCase = null;
+    const taskTitle = djangoContext.dataset.taskTitle || null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Setup CSRF token handling
+        addCsrfToFetch();
+        
+        // Initialize Ace editor
+        editor = ace.edit("editor");
+        editor.setTheme("ace/theme/monokai");
+        editor.session.setMode("ace/mode/python");
+        editor.setFontSize(14);
+
+        // Handle generate task button
+        document.getElementById('generateTaskBtn').addEventListener('click', generateNewTask);
+        
+        // Handle random task button
+        document.getElementById('randomTaskBtn').addEventListener('click', getRandomTask);
+        
+        // Handle run code button
+        document.getElementById('runCodeBtn').addEventListener('click', runCode);
+        
+        // Handle submit solution button
+        document.getElementById('submitCodeBtn').addEventListener('click', submitSolution);
+        
+        // Handle send message button
+        document.getElementById('sendMessageBtn').addEventListener('click', sendMessage);
+        
+        // Handle clear code button
+        document.getElementById('clearCodeBtn').addEventListener('click', function() {
+            if (confirm('Are you sure you want to clear the code?')) {
+                editor.setValue('# Enter your Python code here\n');
+                editor.clearSelection();
+            }
+        });
+        
+        // Handle copy code button
+        document.getElementById('copyCodeBtn').addEventListener('click', function() {
+            const code = editor.getValue();
+            navigator.clipboard.writeText(code).then(function() {
+                alert('Code copied to clipboard!');
+            }, function() {
+                alert('Failed to copy code');
+            });
+        });
+        
+        // If task_id is set, load that specific task
+        if (currentTaskId) {
+            loadTaskById(currentTaskId);
+        }
+    });
+    
+    // Function to load a specific task by ID
+    function loadTaskById(taskId) {
+        const outputContent = document.getElementById('outputContent');
+        outputContent.textContent = 'Loading task...';
+        
+        fetch(`/python-edi/api/tasks/${taskId}/`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                outputContent.textContent = 'Error: ' + data.error;
+                return;
+            }
+            
+            processTask(data, outputContent);
+            
+            // If the task title was passed from the server, show it in the UI
+            if (taskTitle) {
+                outputContent.textContent = `Loaded task: ${taskTitle}. Continue working on your solution!`;
+            }
+        })
+        .catch(error => {
+            outputContent.textContent = 'Error loading task: ' + error.message;
+        });
+    }
+
+    // Function to generate a new task
+    function generateNewTask() {
+        const difficulty = document.querySelector('input[name="difficulty"]:checked').value;
+        const outputContent = document.getElementById('outputContent');
+        
+        outputContent.textContent = 'Generating new task...';
+        
+        fetch('/python-edi/generate-task/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ difficulty })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                outputContent.textContent = 'Error: ' + data.error;
+                return;
+            }
+            
+            processTask(data, outputContent);
+        })
+        .catch(error => {
+            outputContent.textContent = 'Error generating task: ' + error.message;
+        });
+    }
+
+    // Function to get a random task
+    function getRandomTask() {
+        const difficulty = document.querySelector('input[name="difficulty"]:checked').value;
+        const outputContent = document.getElementById('outputContent');
+        
+        outputContent.textContent = 'Getting random task...';
+        
+        fetch(`/python-edi/random-task/?difficulty=${difficulty}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                outputContent.textContent = 'Error: ' + data.error;
+                return;
+            }
+            
+            processTask(data, outputContent);
+        })
+        .catch(error => {
+            outputContent.textContent = 'Error getting task: ' + error.message;
+        });
+    }
+
+    // Common function to process and display task
+    function processTask(data, outputContent) {
+        currentTaskId = data.id;
+        // Store the current test case for later use
+        currentTestCase = data.test_cases && data.test_cases.length > 0 ? data.test_cases[0] : null;
+        
+        document.getElementById('taskTitle').textContent = data.title;
+        document.getElementById('taskDescription').innerHTML = `
+            <p>${data.description.replace(/\n/g, '<br>')}</p>
+            <hr>
+            <h5>Test Case:</h5>
+            <div>
+                <strong>Input:</strong> ${typeof currentTestCase.input === 'object' ? JSON.stringify(currentTestCase.input) : currentTestCase.input}<br>
+                <strong>Expected Output:</strong> ${currentTestCase.expected_output}
+            </div>
+            <p class="mt-2 text-warning">Note: The output of your solution must be an integer.</p>
+        `;
+        
+        // Clear editor and add a helpful starter comment or use template if provided
+        if (data.template) {
+            editor.setValue(data.template);
+        } else {
+            editor.setValue(`# ${data.title}\n# Write your solution below\n\n`);
+        }
+        editor.clearSelection();
+        
+        outputContent.textContent = 'Task loaded! Write your solution and click "Run Code" to test it.';
+    }
+
+    // Function to run code without submitting
+    function runCode() {
+        const code = editor.getValue();
+        const outputContent = document.getElementById('outputContent');
+        const testInput = document.getElementById('testInput').value || (currentTestCase ? currentTestCase.input : '');
+        
+        if (!code.trim()) {
+            outputContent.textContent = 'Please write some code first.';
+            return;
+        }
+        
+        outputContent.textContent = 'Running code...';
+        
+        // Use server-side execution instead of client-side
+        fetch('/python-edi/run-code/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                code,
+                input: testInput 
+            })
+        })
+        .then(response => {
+            // Check if the response is JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            } else {
+                // If not JSON, read as text and throw an error
+                return response.text().then(text => {
+                    throw new Error(`Received non-JSON response: ${text.substring(0, 100)}...`);
+                });
+            }
+        })
+        .then(data => {
+            if (data.error) {
+                outputContent.textContent = data.error;
+            } else {
+                outputContent.textContent = data.output || 'No output';
+            }
+        })
+        .catch(error => {
+            console.error('Error running code:', error);
+            // Fallback to client-side execution if server fails
+            try {
+                const result = evalWithLimits(code);
+                outputContent.textContent = result;
+            } catch (e) {
+                outputContent.textContent = 'Error: ' + e.message;
+            }
+        });
+    }
+
+    // Function to submit solution
+    function submitSolution() {
+        const code = editor.getValue();
+        const outputContent = document.getElementById('outputContent');
+        
+        if (!currentTaskId) {
+            outputContent.textContent = 'Please get a task first.';
+            return;
+        }
+        
+        if (!currentTestCase) {
+            outputContent.textContent = 'No test case found for this task.';
+            return;
+        }
+        
+        if (!code.trim()) {
+            outputContent.textContent = 'Please write some code first.';
+            return;
+        }
+        
+        outputContent.textContent = 'Running your solution...';
+        
+        // First run the code with the test input
+        fetch('/python-edi/run-code/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                code,
+                input: currentTestCase.input
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                outputContent.textContent = `Error executing your code: ${data.error}`;
+                return;
+            }
+            
+            const output = data.output ? data.output.trim() : '';
+            const expectedOutput = String(currentTestCase.expected_output).trim();
+            
+            // Simple exact match check for solution correctness
+            const isCorrect = output === expectedOutput;
+            
+            // Display the result
+            if (isCorrect) {
+                outputContent.textContent = 'Solved! Your solution is correct.\n\n';
+            } else {
+                outputContent.textContent = 'Not solved. Your solution is incorrect.\n\n';
+            }
+            
+            outputContent.textContent += `Input: ${currentTestCase.input}\n`;
+            outputContent.textContent += `Expected Output: ${expectedOutput}\n`;
+            outputContent.textContent += `Your Output: ${output}\n`;
+            outputContent.textContent += `Result: ${isCorrect ? 'PASSED' : 'FAILED'}\n`;
+            
+            // Save the submission to the backend
+            submitSolutionToBackend(code, isCorrect);
+        })
+        .catch(error => {
+            console.error('Error running solution:', error);
+            outputContent.textContent = 'Error checking your solution: ' + error.message;
+        });
+    }
+    
+    // Function to save the submission result to backend
+    function submitSolutionToBackend(code, isCorrect) {
+        fetch(`/python-edi/tasks/${currentTaskId}/submit/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                code,
+                is_correct: isCorrect 
+            })
+        })
+        .then(response => {
+            console.log("Submission saved successfully");
+        })
+        .catch(error => {
+            console.error("Error saving submission:", error);
+        });
+    }
+
+    // Function to send a message for assistance
+    function sendMessage() {
+        const userMessage = document.getElementById('userMessage');
+        const chatMessages = document.getElementById('chatMessages');
+        const message = userMessage.value.trim();
+        
+        if (!message) return;
+        if (!currentTaskId) {
+            alert('Please get a task first.');
+            return;
+        }
+        
+        // Add user message to chat
+        const userMsgElement = document.createElement('div');
+        userMsgElement.className = 'alert alert-primary mb-2';
+        userMsgElement.textContent = message;
+        chatMessages.appendChild(userMsgElement);
+        
+        // Clear input
+        userMessage.value = '';
+        
+        // Add loading message
+        const loadingMsg = document.createElement('div');
+        loadingMsg.className = 'alert alert-light mb-2';
+        loadingMsg.textContent = 'AI is thinking...';
+        chatMessages.appendChild(loadingMsg);
+        
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        // Get the current code
+        const code = editor.getValue();
+        
+        // Send message to server
+        fetch(`/python-edi/tasks/${currentTaskId}/assistance/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message,
+                code,
+                error_message: document.getElementById('outputContent').textContent
+            })
+        })
+        .then(response => {
+            // Check if the response is JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            } else {
+                // If not JSON, read as text and throw an error
+                return response.text().then(text => {
+                    throw new Error(`Received non-JSON response: ${text.substring(0, 100)}...`);
+                });
+            }
+        })
+        .then(data => {
+            // Remove loading message
+            chatMessages.removeChild(loadingMsg);
+            
+            // Add AI response
+            const aiMsgElement = document.createElement('div');
+            aiMsgElement.className = 'alert alert-success mb-2';
+            aiMsgElement.textContent = data.message;
+            chatMessages.appendChild(aiMsgElement);
+            
+            // Also update the chat help tab
+            document.getElementById('chatOutput').innerHTML += `
+                <div class="mb-2">
+                    <strong>You:</strong> ${message}
+                </div>
+                <div class="mb-3 ps-3">
+                    <strong>AI:</strong> ${data.message.replace(/\n/g, '<br>')}
+                </div>
+            `;
+            
+            // Scroll to bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        })
+        .catch(error => {
+            // Remove loading message
+            chatMessages.removeChild(loadingMsg);
+            
+            // Add error message
+            const errorMsg = document.createElement('div');
+            errorMsg.className = 'alert alert-danger mb-2';
+            errorMsg.textContent = 'Error: ' + error.message;
+            chatMessages.appendChild(errorMsg);
+            
+            // Scroll to bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+    }
+
+    // Simple (unsafe) eval with output capturing - for demonstration only
+    // In production, all code execution should happen on the server in a sandbox
+    function evalWithLimits(code) {
+        let output = '';
+        const originalConsoleLog = console.log;
+        
+        // Override console.log to capture output
+        console.log = function(...args) {
+            output += args.join(' ') + '\n';
+            originalConsoleLog.apply(console, args);
+        };
+        
+        try {
+            // Create a safer execution context
+            const safeEval = new Function('code', `
+                try {
+                    // Add print function to simulate Python's print
+                    function print(...args) {
+                        console.log(...args);
+                    }
+                    
+                    // Execute the code
+                    ${code}
+                    
+                    // Return any last expression result
+                    return null;
+                } catch (e) {
+                    throw e;
+                }
+            `);
+            
+            // Set timeout to prevent infinite loops
+            const timeoutId = setTimeout(() => {
+                throw new Error('Execution timed out.');
+            }, 5000);
+            
+            // Execute the code
+            safeEval();
+            
+            clearTimeout(timeoutId);
+        } catch (error) {
+            output += 'Error: ' + error.message;
+        } finally {
+            // Restore console.log
+            console.log = originalConsoleLog;
+        }
+        
+        return output;
+    }
+
+    // Function to get CSRF token from cookies
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    // Add CSRF token to all fetch requests
+    function addCsrfToFetch() {
+        const originalFetch = window.fetch;
+        window.fetch = function(url, options = {}) {
+            if (options.method && options.method.toUpperCase() !== 'GET') {
+                if (!options.headers) {
+                    options.headers = {};
+                }
+                options.headers['X-CSRFToken'] = getCookie('csrftoken');
+            }
+            return originalFetch(url, options);
+        };
+    }
+</script>
+{% endblock %} 
