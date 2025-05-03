@@ -32,21 +32,21 @@ class UserRegisterForm(UserCreationForm):
         })
 
 class CustomAuthenticationForm(AuthenticationForm):
+    username = forms.EmailField(widget=forms.EmailInput())
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+            
         self.fields['username'].widget.attrs.update({
             'placeholder': 'Email',
             'class': 'form-control',
-            'autocomplete': ''
+            'autocomplete': 'email'
         })
         self.fields['password'].widget.attrs.update({
             'placeholder': 'Password',
             'class': 'form-control',
-            'autocomplete': 'new-password',
+            'autocomplete': 'current-password',
         })
 
         for field in self.fields.values():
             field.label = ''
-
-    username = forms.EmailField(label='Email')
