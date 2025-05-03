@@ -42,7 +42,11 @@ class PythonTaskViewSet(viewsets.ModelViewSet):
         data = serializer.data
         
         # Add a template to help students get started
-        data['template'] = get_task_template(instance.title)
+        data['template'] = get_task_template(
+            instance.title, 
+            task_description=instance.description,
+            test_cases=instance.test_cases
+        )
         
         return Response(data)
 
@@ -125,7 +129,7 @@ def random_task(request):
 def submit_solution(request, task_id):
     """
     Submit a solution for a Python task.
-    This endpoint checks the solution correctness on the server side.
+    This endpoint checks the solution correctness on all test cases.
     Authentication is disabled for testing
     """
     try:
@@ -151,25 +155,39 @@ def submit_solution(request, task_id):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # Get test case input
-    test_case = task.test_cases[0]
-    test_input = test_case.get("input", "")
-    expected_output = str(test_case.get("expected_output", "")).strip()
+    # Test the solution against all test cases
+    test_results = []
+    all_passed = True
     
-    # Run the code with test input
-    result = execute_python_code(code, test_input)
-    
-    if not result['success']:
-        # Code execution failed
-        return Response({
-            'success': False,
-            'error': result.get('error', 'Code execution failed'),
-            'submission_id': None
+    for i, test_case in enumerate(task.test_cases):
+        test_input = test_case.get("input", "")
+        expected_output = str(test_case.get("expected_output", "")).strip()
+        
+        # Run the code with test input
+        result = execute_python_code(code, test_input)
+        
+        if not result['success']:
+            # Code execution failed
+            return Response({
+                'success': False,
+                'error': result.get('error', 'Code execution failed'),
+                'submission_id': None
+            })
+        
+        # Check if output matches expected output
+        actual_output = str(result.get('output', '')).strip()
+        is_correct = actual_output == expected_output
+        
+        if not is_correct:
+            all_passed = False
+        
+        test_results.append({
+            "test_case_index": i,
+            "input": test_input,
+            "expected_output": expected_output,
+            "actual_output": actual_output,
+            "passed": is_correct
         })
-    
-    # Check if output matches expected output
-    actual_output = str(result.get('output', '')).strip()
-    is_correct = actual_output == expected_output
     
     # Create submission record for authenticated users
     submission_id = None
@@ -178,27 +196,18 @@ def submit_solution(request, task_id):
             user=request.user,
             task=task,
             code=code,
-            is_successful=is_correct,
-            error_message=None if is_correct else "Output does not match expected output",
-            output=json.dumps([{
-                "input": test_input,
-                "expected_output": expected_output,
-                "actual_output": actual_output,
-                "passed": is_correct
-            }])
+            is_successful=all_passed,
+            error_message=None if all_passed else "One or more test cases failed",
+            output=json.dumps(test_results)
         )
         submission_id = submission.id
     
     # Return detailed result information
     return Response({
         'submission_id': submission_id,
-        'success': is_correct,
-        'details': {
-            'input': test_input,
-            'expected_output': expected_output,
-            'actual_output': actual_output,
-            'passed': is_correct
-        }
+        'success': all_passed,
+        'results': test_results,
+        'message': 'All test cases passed!' if all_passed else 'One or more test cases failed'
     })
 
 @api_view(['POST'])
