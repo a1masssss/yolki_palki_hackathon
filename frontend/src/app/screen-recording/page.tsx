@@ -24,11 +24,15 @@ export default function ScreenRecordingPage() {
   const recordedChunksRef = useRef<BlobPart[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const urlRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
+      }
+      if (urlRef.current) {
+        URL.revokeObjectURL(urlRef.current);
       }
     };
   }, []);
@@ -43,24 +47,62 @@ export default function ScreenRecordingPage() {
         audio: true,
       });
 
-      mediaRecorderRef.current = new MediaRecorder(stream);
+      console.log("Stream obtained:", stream);
+
+      const options = { mimeType: "video/webm;codecs=vp9,opus" };
+      try {
+        mediaRecorderRef.current = new MediaRecorder(stream, options);
+        console.log("MediaRecorder created with VP9/Opus");
+      } catch (e) {
+        console.error("VP9/Opus not supported, trying alternative codec", e);
+        try {
+          mediaRecorderRef.current = new MediaRecorder(stream, {
+            mimeType: "video/webm;codecs=vp8,opus",
+          });
+          console.log("MediaRecorder created with VP8/Opus");
+        } catch (e) {
+          console.error("No compatible codec found, using default", e);
+          mediaRecorderRef.current = new MediaRecorder(stream);
+        }
+      }
 
       mediaRecorderRef.current.ondataavailable = (event) => {
+        console.log("Data available event:", event.data.size);
         if (event.data.size > 0) {
           recordedChunksRef.current.push(event.data);
+          console.log(
+            "Recorded chunks length:",
+            recordedChunksRef.current.length
+          );
         }
       };
 
       mediaRecorderRef.current.onstop = () => {
+        console.log("MediaRecorder stopped");
+        console.log(
+          "Creating blob from",
+          recordedChunksRef.current.length,
+          "chunks"
+        );
+
         const blob = new Blob(recordedChunksRef.current, {
           type: "video/webm",
         });
+        console.log("Blob created:", blob.size, "bytes");
+
+        if (urlRef.current) {
+          URL.revokeObjectURL(urlRef.current);
+        }
+        urlRef.current = URL.createObjectURL(blob);
+        console.log("Created blob URL:", urlRef.current);
+
         setRecordedBlob(blob);
         setRecordingComplete(true);
         setIsRecording(false);
 
         if (videoRef.current) {
-          videoRef.current.src = URL.createObjectURL(blob);
+          videoRef.current.src = urlRef.current;
+          videoRef.current.load();
         }
 
         if (timerRef.current) {
@@ -68,9 +110,27 @@ export default function ScreenRecordingPage() {
         }
 
         stream.getTracks().forEach((track) => track.stop());
+
+        const formData = new FormData();
+        formData.append("video", blob, "screen-recording.webm");
+        formData.append("title", "Screen Recording");
+        formData.append("duration", recordingTime.toString());
+
+        // const response = await fetch("/api/upload", {
+        //   method: "POST",
+        //   body: formData,
+        // });
+
+        // if (response.ok) {
+        //   const data = await response.json();
+        //   console.log("Upload successful:", data);
+        // } else {
+        //   console.error("Upload failed:", response.statusText);
+        // }
       };
 
-      mediaRecorderRef.current.start();
+      mediaRecorderRef.current.start(500);
+      console.log("Recording started");
       setIsRecording(true);
       setRecordingTime(0);
       recordedChunksRef.current = [];
@@ -85,6 +145,8 @@ export default function ScreenRecordingPage() {
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
+      console.log("Stopping recording...");
+      mediaRecorderRef.current.requestData();
       mediaRecorderRef.current.stop();
     }
   };
@@ -152,11 +214,23 @@ export default function ScreenRecordingPage() {
             <div className="lg:col-span-2">
               <Card className="mb-6">
                 <div className="p-4">
-                  <video
-                    ref={videoRef}
-                    controls
-                    className="w-full rounded-md"
-                  />
+                  {recordedBlob ? (
+                    <div>
+                      <video
+                        key={urlRef.current || "no-video"}
+                        src={urlRef.current || undefined}
+                        ref={videoRef}
+                        controls
+                        className="w-full rounded-md"
+                        autoPlay={false}
+                        playsInline
+                        muted={false}
+                        onError={(e) => console.error("Video error:", e)}
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-center py-8">No recording available</p>
+                  )}
                 </div>
               </Card>
 
@@ -258,7 +332,26 @@ export default function ScreenRecordingPage() {
                   </div>
 
                   <div className="mt-6 space-y-3">
-                    <Button className="w-full">Download Recording</Button>
+                    <Button
+                      className="w-full"
+                      onClick={() => {
+                        if (recordedBlob) {
+                          const url = URL.createObjectURL(recordedBlob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `screen-recording-${new Date()
+                            .toISOString()
+                            .slice(0, 19)
+                            .replace(/:/g, "-")}.webm`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                        }
+                      }}
+                    >
+                      Download Recording
+                    </Button>
                     <Button
                       variant="outline"
                       className="w-full"

@@ -22,4 +22,5 @@ urlpatterns = [
     path('', include('main.urls')),
     path('main/', include('main.urls')),
     path('users/', include('users.urls')),
+    path('media/', include('media_recorder.urls')),
 ]
