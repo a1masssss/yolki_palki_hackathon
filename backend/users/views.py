@@ -3,7 +3,7 @@ from users.forms import UserRegisterForm, CustomAuthenticationForm
 from django.views.generic import CreateView
 from django.views.generic.edit import FormView
 from django.urls import reverse_lazy
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login
 from django.shortcuts import redirect
 
 
@@ -30,7 +30,3 @@ class CustomLoginView(FormView):
             form.add_error(None, "Incorrect pass or email") 
             return self.form_invalid(form)
 
-
-def logout_view(request):
-    logout(request)
-    return render(request, 'users/logout.html')
