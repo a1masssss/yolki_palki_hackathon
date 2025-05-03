@@ -3,7 +3,16 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Play, Save, Trash, Code, Copy, AlertTriangle } from "lucide-react";
+import {
+  Play,
+  Save,
+  Trash,
+  Code,
+  Copy,
+  AlertTriangle,
+  Check,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import CodeEditor from "@/components/code-editor";
 import ChatAssistance from "@/components/chat-assistance";
@@ -11,22 +20,49 @@ import HintsSection from "@/components/hints-section";
 import TaskGenerator from "@/components/task-generator";
 import AISolutionGenerator from "@/components/ai-solution-generator";
 import axios from "axios";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 // Sample Python code for initial editor content
 const initialCode = `def main(input):
     # Your code here
 `;
 
+// Define interface for test cases
+interface TestCase {
+  input: string;
+  expectedOutput: string;
+}
+
+// Define interface for task
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: string;
+  testCases: TestCase[];
+  startingCode: string;
+  hints?: string[];
+  solution?: string;
+}
+
 export default function PythonEDIPage() {
   const [code, setCode] = useState(initialCode);
   const [output, setOutput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [showPyodideWarning, setShowPyodideWarning] = useState(true);
-  const [currentTask, setCurrentTask] = useState<{
-    title: string;
-    description: string;
-    startingCode: string;
-  } | null>(null);
+  const [selectedTestCaseIndex, setSelectedTestCaseIndex] = useState<number>(0);
+  const [currentTestCase, setCurrentTestCase] = useState<TestCase | null>(null);
+  const [testResult, setTestResult] = useState<"success" | "failure" | null>(
+    null
+  );
+  const [currentTask, setCurrentTask] = useState<Task | null>(null);
 
   useEffect(() => {
     // Set initial message
@@ -35,32 +71,78 @@ export default function PythonEDIPage() {
     );
   }, []);
 
-  const handleSelectTask = (task: any) => {
+  // When a task is selected, update current task and set the first test case as selected
+  const handleSelectTask = (task: Task) => {
     setCurrentTask(task);
     setCode(task.startingCode);
     setOutput("");
+    setTestResult(null);
+
+    if (task.testCases && task.testCases.length > 0) {
+      setSelectedTestCaseIndex(0);
+      setCurrentTestCase(task.testCases[0]);
+    }
+  };
+
+  // When test case selection changes
+  const handleTestCaseChange = (value: string) => {
+    const index = parseInt(value);
+    setSelectedTestCaseIndex(index);
+
+    if (currentTask && currentTask.testCases && currentTask.testCases[index]) {
+      setCurrentTestCase(currentTask.testCases[index]);
+      setTestResult(null);
+    }
   };
 
   const runCode = async () => {
     setIsRunning(true);
     setOutput("Running...");
+    setTestResult(null);
 
     try {
-      // Use the mock execution function
-      setTimeout(() => {
-        const result = axios.post("http://127.0.0.1:8000/python-edi/run-code/", {
-          code: code,
-          input: currentTask?.testCases[0].input,
-        });
-        
-        setOutput(result);
+      // Make sure we have a test case selected
+      if (!currentTestCase) {
+        setOutput("No test case selected. Please select a test case to run.");
         setIsRunning(false);
-      }, 500); // Add a small delay to simulate processing
+        return;
+      }
+
+      // Get the input from the current test case
+      const input = currentTestCase.input;
+
+      // Call the API to run the code
+      const response = await axios.post(
+        "http://127.0.0.1:8000/python-edi/run-code/",
+        {
+          code: code,
+          input: input,
+        }
+      );
+
+      // Get the result from the API response
+      const result = response.data.output || response.data;
+      setOutput(result);
+
+      // Compare with expected output
+      const expectedOutput = currentTestCase.expectedOutput;
+      const normalizedResult = result.trim();
+      const normalizedExpected = expectedOutput.trim();
+
+      // Set test result based on comparison
+      if (normalizedResult === normalizedExpected) {
+        setTestResult("success");
+      } else {
+        setTestResult("failure");
+      }
+
+      setIsRunning(false);
     } catch (error) {
       console.error("Python execution error:", error);
       setOutput(
         `Error: ${error instanceof Error ? error.message : String(error)}`
       );
+      setTestResult("failure");
       setIsRunning(false);
     }
   };
@@ -69,6 +151,7 @@ export default function PythonEDIPage() {
     if (confirm("Are you sure you want to clear the editor?")) {
       setCode("");
       setOutput("");
+      setTestResult(null);
     }
   };
 
@@ -138,11 +221,11 @@ export default function PythonEDIPage() {
                 </span>
                 <Button
                   onClick={runCode}
-                  disabled={isRunning}
+                  disabled={isRunning || !currentTestCase}
                   className="bg-emerald-500 hover:bg-emerald-600"
                 >
                   <Play className="h-4 w-4 mr-2" />
-                  Run Code
+                  Run Code with Test Case
                 </Button>
               </div>
             </div>
@@ -159,6 +242,19 @@ export default function PythonEDIPage() {
                   <div className="h-full">
                     <div className="bg-black text-green-400 font-mono p-4 h-full overflow-auto whitespace-pre-wrap">
                       {output || "Run your code to see output here"}
+                      {testResult && (
+                        <div
+                          className={`mt-4 p-2 rounded ${
+                            testResult === "success"
+                              ? "bg-green-900"
+                              : "bg-red-900"
+                          }`}
+                        >
+                          {testResult === "success"
+                            ? "✅ Test Passed! Your output matches the expected result."
+                            : "❌ Test Failed! Your output doesn't match the expected result."}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </TabsContent>

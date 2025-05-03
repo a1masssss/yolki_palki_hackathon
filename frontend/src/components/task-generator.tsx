@@ -63,11 +63,7 @@ export default function TaskGenerator({
           })),
           startingCode:
             apiTask.startingCode ||
-            `# Write your solution for "${apiTask.title}" here\n\n
-            
-            def main(input):
-                # Your code here
-            `,
+            `# Write your solution for "${apiTask.title}" here\n\ndef main(input):\n    # Your code here\n`,
           hints: apiTask.hints || [],
           solution: apiTask.solution || "",
         };

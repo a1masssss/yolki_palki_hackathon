@@ -145,11 +145,18 @@ for i in range(1, 6):
 </div>
 <script>
     let editor;
-    // Get values from data attributes
-    const djangoContext = document.getElementById('django-context');
-    let currentTaskId = djangoContext.dataset.taskId || null;
+    // Initialize context safely using window object
+    window.djangoContext = {
+        taskId: "{% if task_id %}{{ task_id }}{% else %}{% endif %}",
+        taskTitle: "{% if task_title %}{{ task_title }}{% else %}{% endif %}"
+    };
+    
+    // Convert empty strings to null
+    if (!window.djangoContext.taskId) window.djangoContext.taskId = null;
+    if (!window.djangoContext.taskTitle) window.djangoContext.taskTitle = null;
+    
+    let currentTaskId = window.djangoContext.taskId;
     let currentTestCase = null;
-    const taskTitle = djangoContext.dataset.taskTitle || null;
 
     document.addEventListener('DOMContentLoaded', function() {
         // Setup CSRF token handling
@@ -218,8 +225,8 @@ for i in range(1, 6):
             processTask(data, outputContent);
             
             // If the task title was passed from the server, show it in the UI
-            if (taskTitle) {
-                outputContent.textContent = `Loaded task: ${taskTitle}. Continue working on your solution!`;
+            if (window.djangoContext.taskTitle) {
+                outputContent.textContent = `Loaded task: ${window.djangoContext.taskTitle}. Continue working on your solution!`;
             }
         })
         .catch(error => {
@@ -258,20 +265,37 @@ for i in range(1, 6):
     // Common function to process and display task
     function processTask(data, outputContent) {
         currentTaskId = data.id;
-        // Store the current test case for later use
+        // Store all test cases for later use
         currentTestCase = data.test_cases && data.test_cases.length > 0 ? data.test_cases[0] : null;
         
         document.getElementById('taskTitle').textContent = data.title;
+        
+        // Generate HTML for all test cases
+        let testCasesHTML = '';
+        if (data.test_cases && data.test_cases.length > 0) {
+            testCasesHTML += '<h5>Test Cases:</h5>';
+            data.test_cases.forEach((testCase, index) => {
+                testCasesHTML += `
+                    <div class="test-case mb-2 p-2 border rounded">
+                        <strong>Test Case ${index + 1}:</strong><br>
+                        <strong>Input:</strong> ${typeof testCase.input === 'object' ? JSON.stringify(testCase.input) : testCase.input}<br>
+                        <strong>Expected Output:</strong> ${testCase.expected_output}
+                    </div>
+                `;
+            });
+            testCasesHTML += '<p class="mt-2 text-warning">Note: The output of your solution must match exactly.</p>';
+        }
+        
         document.getElementById('taskDescription').innerHTML = `
             <p>${data.description.replace(/\n/g, '<br>')}</p>
             <hr>
-            <h5>Test Case:</h5>
-            <div>
-                <strong>Input:</strong> ${typeof currentTestCase.input === 'object' ? JSON.stringify(currentTestCase.input) : currentTestCase.input}<br>
-                <strong>Expected Output:</strong> ${currentTestCase.expected_output}
-            </div>
-            <p class="mt-2 text-warning">Note: The output of your solution must be an integer.</p>
+            ${testCasesHTML}
         `;
+        
+        // Set the first test case input as default in the input field
+        if (currentTestCase) {
+            document.getElementById('testInput').value = currentTestCase.input;
+        }
         
         // Clear editor and add a helpful starter comment or use template if provided
         if (data.template) {
@@ -297,6 +321,12 @@ for i in range(1, 6):
         
         outputContent.textContent = 'Running code...';
         
+        // Automatically add main function call if needed
+        let processedCode = code;
+        if (processedCode.includes("def main(") && !processedCode.includes("main(")) {
+            processedCode += "\n\n# Auto-added by the system\ninput_value = input()\nmain(input_value)\n";
+        }
+        
         // Use server-side execution instead of client-side
         fetch('/python-edi/run-code/', {
             method: 'POST',
@@ -304,7 +334,7 @@ for i in range(1, 6):
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
-                code,
+                code: processedCode,
                 input: testInput 
             })
         })
@@ -343,27 +373,27 @@ for i in range(1, 6):
             return;
         }
         
-        if (!currentTestCase) {
-            outputContent.textContent = 'No test case found for this task.';
-            return;
-        }
-        
         if (!code.trim()) {
             outputContent.textContent = 'Please write some code first.';
             return;
         }
         
-        outputContent.textContent = 'Running your solution...';
+        outputContent.textContent = 'Testing your solution against all test cases...';
         
-        // First run the code with the test input
-        fetch('/python-edi/run-code/', {
+        // Automatically add main function call if needed
+        let processedCode = code;
+        if (processedCode.includes("def main(") && !processedCode.includes("main(")) {
+            processedCode += "\n\n# Auto-added by the system\ninput_value = input()\nmain(input_value)\n";
+        }
+        
+        // Submit the solution to be tested against all test cases
+        fetch(`/python-edi/tasks/${currentTaskId}/submit/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
-                code,
-                input: currentTestCase.input
+                code: processedCode
             })
         })
         .then(response => response.json())
@@ -373,50 +403,27 @@ for i in range(1, 6):
                 return;
             }
             
-            const output = data.output ? data.output.trim() : '';
-            const expectedOutput = String(currentTestCase.expected_output).trim();
-            
-            // Simple exact match check for solution correctness
-            const isCorrect = output === expectedOutput;
-            
-            // Display the result
-            if (isCorrect) {
-                outputContent.textContent = 'Solved! Your solution is correct.\n\n';
+            // Display the overall result
+            if (data.success) {
+                outputContent.textContent = 'Congratulations! All test cases passed!\n\n';
             } else {
-                outputContent.textContent = 'Not solved. Your solution is incorrect.\n\n';
+                outputContent.textContent = 'Not solved. One or more test cases failed.\n\n';
             }
             
-            outputContent.textContent += `Input: ${currentTestCase.input}\n`;
-            outputContent.textContent += `Expected Output: ${expectedOutput}\n`;
-            outputContent.textContent += `Your Output: ${output}\n`;
-            outputContent.textContent += `Result: ${isCorrect ? 'PASSED' : 'FAILED'}\n`;
-            
-            // Save the submission to the backend
-            submitSolutionToBackend(code, isCorrect);
+            // Display detailed results for each test case
+            if (data.results) {
+                data.results.forEach((result, index) => {
+                    outputContent.textContent += `--- Test Case ${index + 1} ---\n`;
+                    outputContent.textContent += `Input: ${result.input}\n`;
+                    outputContent.textContent += `Expected Output: ${result.expected_output}\n`;
+                    outputContent.textContent += `Your Output: ${result.actual_output}\n`;
+                    outputContent.textContent += `Result: ${result.passed ? 'PASSED' : 'FAILED'}\n\n`;
+                });
+            }
         })
         .catch(error => {
-            console.error('Error running solution:', error);
+            console.error('Error checking solution:', error);
             outputContent.textContent = 'Error checking your solution: ' + error.message;
-        });
-    }
-    
-    // Function to save the submission result to backend
-    function submitSolutionToBackend(code, isCorrect) {
-        fetch(`/python-edi/tasks/${currentTaskId}/submit/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ 
-                code,
-                is_correct: isCorrect 
-            })
-        })
-        .then(response => {
-            console.log("Submission saved successfully");
-        })
-        .catch(error => {
-            console.error("Error saving submission:", error);
         });
     }
 
