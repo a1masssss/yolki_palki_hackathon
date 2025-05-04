@@ -6,10 +6,12 @@ from rest_framework.permissions import IsAuthenticated
 from .models import PythonTask, Submission, ChatMessage
 from .serializers import PythonTaskSerializer, SubmissionSerializer, ChatMessageSerializer
 from .openai_utils import execute_python_code, get_ai_assistance, get_task_template, generate_python_task
-import json
 from rest_framework import permissions
 import random
 import re
+import subprocess
+import tempfile
+import os
 
 def editor_view(request):
     """
@@ -153,6 +155,9 @@ def submit_solution(request):
             {"error": "Code is required"},
             status=status.HTTP_400_BAD_REQUEST
         )
+    
+    
+
         
     # Check if task has test cases
     if not task.get('testCases') or len(task.get('testCases', [])) == 0:
@@ -161,38 +166,8 @@ def submit_solution(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # Preprocess the code to handle return statements in main function
-    if "def main(" in code and "return" in code:
-        # Find main function and replace return statements with print statements
-        lines = code.split('\n')
-        in_main_func = False
-        main_indent = ""
-        
-        for i in range(len(lines)):
-            if re.match(r'^\s*def\s+main\s*\(', lines[i]):
-                in_main_func = True
-                # Get the indentation level
-                main_indent = re.match(r'^(\s*)', lines[i]).group(1)
-            elif in_main_func and lines[i].strip() and not lines[i].startswith(main_indent + " "):
-                # End of main function
-                in_main_func = False
-            
-            # Replace return with print in the main function
-            if in_main_func and "return" in lines[i]:
-                # Extract the returned value
-                return_match = re.search(r'return\s+(.*?)(\s*#.*)?$', lines[i])
-                if return_match:
-                    returned_value = return_match.group(1).strip()
-                    # Replace with print statement
-                    indent = re.match(r'^(\s*)', lines[i]).group(1)
-                    lines[i] = f"{indent}print(str({returned_value}))  # Auto-converted return"
-        
-        code = '\n'.join(lines)
-    
-    # Test the solution against all test cases
-    test_results = []
     all_passed = True
-    execution_error = None
+    test_results = []
     
     for i, test_case in enumerate(task.get('testCases')):
         test_input = test_case.get('input', None)
@@ -203,55 +178,56 @@ def submit_solution(request):
 
         if expected_output is None:
             print("Expected output is None")
-        
-        # Ensure code is automatically run with the test input
-        processed_code = code
-        if "def main(" in processed_code and "main(" not in processed_code.split("def main(")[1]:
-            processed_code += "\n\n# Auto-added by the system\ninput_value = input()\nmain(input_value)\n"
-        
-        # Run the code with test input
-        result = execute_python_code(processed_code, test_input)
-        
-        if not result['success']:
-            # Code execution failed
-            execution_error = result.get('error', 'Code execution failed')
-            return Response({
-                'success': False,
-                'error': execution_error,
-                'submission_id': None
+            
+        with tempfile.NamedTemporaryFile(suffix='.py', delete=False, mode='w') as script_file:
+            script_path = script_file.name
+            if "def main(" in code:
+                script_file.write(code + "\n\n# Auto-added by the system\nif __name__ == \"__main__\":\n    test_input = input()\n    result = main(test_input)\n    print(f\"{result}\")\n")
+            else:
+                script_file.write(code)
+                
+        try:
+            # Run the script with the test input
+            print(f"Running test with input: '{test_input}'")
+            result = subprocess.run(
+                ["python", script_path],
+                input=test_input,
+                capture_output=True,
+                text=True,
+                encoding='utf-8'  
+            )
+            
+            # Check the output
+            print(result)
+            actual_output = result.stdout.strip()
+            stderr_output = result.stderr.strip()
+            print(f"Script stdout: '{actual_output}'")
+            print(f"Script stderr: '{stderr_output}'")
+            is_correct = actual_output == expected_output
+            
+            if not is_correct:
+                all_passed = False
+                
+            test_results.append({
+                "test_case_index": i,
+                "input": test_input,
+                "expected_output": expected_output,
+                "actual_output": actual_output,
+                "passed": is_correct
             })
-        
-        # Check if output matches expected output
-        actual_output = str(result.get('output', '')).strip()
-        is_correct = actual_output == expected_output
-        
-        if not is_correct:
-            all_passed = False
-        
-        test_results.append({
-            "test_case_index": i,
-            "input": test_input,
-            "expected_output": expected_output,
-            "actual_output": actual_output,
-            "passed": is_correct
-        })
-    
-    # Create submission record for authenticated users
-    submission_id = None
-    if request.user.is_authenticated:
-        submission = Submission.objects.create(
-            user=request.user,
-            task=task,
-            code=code,
-            is_successful=all_passed,
-            error_message=execution_error if execution_error else None if all_passed else "One or more test cases failed",
-            output=json.dumps(test_results)
-        )
-        submission_id = submission.id
+            
+        finally:
+            # Clean up the temporary file
+            try:
+                os.unlink(script_path)
+            except Exception as e:
+                print(f"Warning: Could not delete temporary file {script_path}: {e}")
     
     # Return detailed result information
+
+    print(test_results)
+
     return Response({
-        'submission_id': submission_id,
         'success': all_passed,
         'results': test_results,
         'message': 'All test cases passed!' if all_passed else 'One or more test cases failed'

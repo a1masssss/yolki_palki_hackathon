@@ -98,22 +98,20 @@ def process_video(video_id):
 
 def get_gemini_summary(video_path):
     try:
-        prompt = (
-            "Summarize this 45-second screen recording for study purposes:\n\n"
-            "1. Start by identifying what's it about: \"The screen shows e.g. PDF, jupyter notebook, video, movie, etc.\"\n\n"
-            "2. Extract only what's meaningful:\n"
-            "   - Focus on content visible for 5+ seconds\n"
-            "   - Capture key concepts, terms, and core information\n"
-            "   - Note any content that receives special emphasis or repetition\n"
-            "   - Document any mathematical expressions, technical formulas, or programming syntax\n"
-            "   - Describe significant visual elements or diagrams concisely\n\n"
-            "3. Deliberately omit:\n"
-            "   - Fleeting information or rapidly changing screens\n"
-            "   - Peripheral details not central to the main topic\n\n"
-            "4. Provide minimal contextual framing if the segment appears to be part of a broader subject\n\n"
-            "5. Prioritize information with highest educational value\n\n"
-            "Format your summary in a clear, structured manner optimized for retention and review."
-        )
+        prompt = "Summarize this 45-second screen recording for study purposes:\n\n"
+        prompt += "1. Start by identifying what's it about: \"The screen shows e.g. PDF, jupyter notebook, video, movie, etc.\"\n\n"
+        prompt += "2. Extract only what's meaningful:\n"
+        prompt += "   - Focus on content visible for 5+ seconds\n"
+        prompt += "   - Capture key concepts, terms, and core information\n"
+        prompt += "   - Note any content that receives special emphasis or repetition\n"
+        prompt += "   - Document any mathematical expressions, technical formulas, or programming syntax\n"
+        prompt += "   - Describe significant visual elements or diagrams concisely\n\n"
+        prompt += "3. Deliberately omit:\n"
+        prompt += "   - Fleeting information or rapidly changing screens\n"
+        prompt += "   - Peripheral details not central to the main topic\n\n"
+        prompt += "4. Provide minimal contextual framing if the segment appears to be part of a broader subject\n\n"
+        prompt += "5. Prioritize information with highest educational value\n\n"
+        prompt += "Format your summary in a clear, structured manner optimized for retention and review."
 
         myfile = client.files.upload(file=video_path)
         print(f"{myfile=}")
@@ -122,13 +120,13 @@ def get_gemini_summary(video_path):
         video_bytes = open(video_path, 'rb').read()
 
         response = client.models.generate_content(
-            model='models/gemini-1.5-pro',
+            model='models/gemini-1.5-flash',
             contents=types.Content(
                 parts=[
                     types.Part(
                         inline_data=types.Blob(data=video_bytes, mime_type='video/mp4')
                     ),
-                    types.Part(text='Please summarize the video in 3 sentences.')
+                    types.Part(text=prompt)
                 ]
             )
         )

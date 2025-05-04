@@ -121,16 +121,19 @@ export default function PythonEDIPage() {
       );
 
       // Get the result from the API response
-      const result = response.data.output || response.data;
-      setOutput(result);
+      const result = response.data.results || response.data;
 
-      // Compare with expected output
-      const expectedOutput = currentTestCase.expectedOutput;
-      const normalizedResult = result.trim();
-      const normalizedExpected = expectedOutput.trim();
+      // Handle the result properly - convert object to string if needed
+      if (typeof result === "object") {
+        // Format the object as a readable string
+        setOutput(JSON.stringify(result, null, 2));
+        console.log("Output set to:", JSON.stringify(result, null, 2));
+      } else {
+        setOutput(String(result));
+        console.log("Output set to:", String(result));
+      }
 
-      // Set test result based on comparison
-      if (normalizedResult === normalizedExpected) {
+      if (response.data.success) {
         setTestResult("success");
       } else {
         setTestResult("failure");

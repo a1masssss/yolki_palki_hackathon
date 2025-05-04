@@ -14,12 +14,14 @@ import {
 import Link from "next/link";
 import ChatInterface from "@/components/chat-interface";
 import AIGeneratedContent from "@/components/ai-generated-content";
+import axios from "axios";
 
 export default function ScreenRecordingPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingComplete, setRecordingComplete] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [summaries, setSummaries] = useState<any[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<BlobPart[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -113,20 +115,27 @@ export default function ScreenRecordingPage() {
 
         const formData = new FormData();
         formData.append("video", blob, "screen-recording.webm");
-        formData.append("title", "Screen Recording");
-        formData.append("duration", recordingTime.toString());
 
-        // const response = await fetch("/api/upload", {
-        //   method: "POST",
-        //   body: formData,
-        // });
+        axios
+          .post("http://127.0.0.1:8000/media/upload/", formData)
+          .then((response) => {
+            console.log("Upload response:", response.data);
+          })
+          .catch((error) => {
+            console.error("Upload failed:", error);
+          });
 
-        // if (response.ok) {
-        //   const data = await response.json();
-        //   console.log("Upload successful:", data);
-        // } else {
-        //   console.error("Upload failed:", response.statusText);
-        // }
+        axios
+          .get(
+            `http://127.0.0.1:8000/media/summaries/${response.data.video_id}`
+          )
+          .then((response) => {
+            console.log("Summaries response:", response.data);
+            setSummaries(response.data.summaries);
+          })
+          .catch((error) => {
+            console.error("Summaries fetch failed:", error);
+          });
       };
 
       mediaRecorderRef.current.start(500);
