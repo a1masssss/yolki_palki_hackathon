@@ -10,6 +10,7 @@ import {
   MessageSquare,
   FileText,
   HelpCircle,
+  Upload,
 } from "lucide-react";
 import Link from "next/link";
 import ChatInterface from "@/components/chat-interface";
@@ -22,11 +23,14 @@ export default function ScreenRecordingPage() {
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
   const [summaries, setSummaries] = useState<any[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<BlobPart[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const urlRef = useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [summary, setSummary] = useState("");
 
   useEffect(() => {
     return () => {
@@ -79,7 +83,7 @@ export default function ScreenRecordingPage() {
         }
       };
 
-      mediaRecorderRef.current.onstop = () => {
+      mediaRecorderRef.current.onstop = async () => {
         console.log("MediaRecorder stopped");
         console.log(
           "Creating blob from",
@@ -114,28 +118,43 @@ export default function ScreenRecordingPage() {
         stream.getTracks().forEach((track) => track.stop());
 
         const formData = new FormData();
+
+        console.log("Appending blob to FormData:", {
+          type: blob.type,
+          size: blob.size,
+          lastModified: new Date().toISOString(),
+        });
+
         formData.append("video", blob, "screen-recording.webm");
 
-        axios
-          .post("http://127.0.0.1:8000/media/upload/", formData)
-          .then((response) => {
-            console.log("Upload response:", response.data);
-          })
-          .catch((error) => {
-            console.error("Upload failed:", error);
-          });
+        try {
+          console.log("Starting upload to backend...");
+          const response = await axios.post(
+            "http://127.0.0.1:8000/media/upload",
+            formData
+          );
+          console.log("Upload response:", response.data);
 
-        axios
-          .get(
-            `http://127.0.0.1:8000/media/summaries/${response.data.video_id}`
-          )
-          .then((response) => {
-            console.log("Summaries response:", response.data);
-            setSummaries(response.data.summaries);
-          })
-          .catch((error) => {
-            console.error("Summaries fetch failed:", error);
-          });
+          if (response.data && response.data.video_id) {
+            console.log("Video ID received:", response.data.video_id);
+            try {
+              const summaryResponse = await axios.get(
+                `http://127.0.0.1:8000/media/summaries/${response.data.video_id}`
+              );
+              console.log("Summaries response:", summaryResponse.data);
+              setSummaries(summaryResponse.data.summaries);
+              console.log("Summaries set to:", summaries);
+            } catch (error) {
+              console.error("Summaries fetch failed:", error);
+            }
+          }
+        } catch (error: any) {
+          console.error("Upload failed with error:", error);
+          if (error.response) {
+            console.error("Error response data:", error.response.data);
+            console.error("Error response status:", error.response.status);
+          }
+        }
       };
 
       mediaRecorderRef.current.start(500);
@@ -157,6 +176,84 @@ export default function ScreenRecordingPage() {
       console.log("Stopping recording...");
       mediaRecorderRef.current.requestData();
       mediaRecorderRef.current.stop();
+    }
+  };
+
+  const handleUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check if file is a webm file
+    if (file.type !== "video/webm") {
+      alert("Please upload a .webm file");
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      // Use the file directly instead of creating a new Blob
+      if (urlRef.current) {
+        URL.revokeObjectURL(urlRef.current);
+      }
+      urlRef.current = URL.createObjectURL(file);
+
+      setRecordedBlob(file);
+      setRecordingComplete(true);
+
+      if (videoRef.current) {
+        videoRef.current.src = urlRef.current;
+        videoRef.current.load();
+      }
+
+      const formData = new FormData();
+      console.log("Uploading file:", {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        lastModified: new Date(file.lastModified).toISOString(),
+      });
+
+      // Just append the file directly
+      formData.append("video", file);
+
+      try {
+        console.log("Starting upload to backend...");
+        const response = await axios.post(
+          "http://127.0.0.1:8000/media/upload",
+          formData
+        );
+        console.log("Upload response:", response.data);
+
+        if (response.data && response.data.video_id) {
+          console.log("Video ID received:", response.data.video_id);
+          try {
+            const summaryResponse = await axios.get(
+              `http://127.0.0.1:8000/media/summaries/${response.data.video_id}`
+            );
+            console.log("Summaries response:", summaryResponse.data);
+            setSummaries(summaryResponse.data.summaries);
+          } catch (error) {
+            console.error("Summaries fetch failed:", error);
+          }
+        }
+      } catch (error: any) {
+        console.error("Upload failed with error:", error);
+        if (error.response) {
+          console.error("Error response data:", error.response.data);
+          console.error("Error response status:", error.response.status);
+        }
+      }
+    } catch (error) {
+      console.error("Error processing file:", error);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -208,14 +305,41 @@ export default function ScreenRecordingPage() {
                 Stop Recording
               </Button>
             ) : (
-              <Button
-                size="lg"
-                onClick={startRecording}
-                className="bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-2 px-8 py-6 text-lg rounded-full"
-              >
-                <Camera className="h-6 w-6" />
-                Start Recording
-              </Button>
+              <div className="flex flex-row gap-4">
+                <Button
+                  size="lg"
+                  onClick={startRecording}
+                  className="bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-2 px-8 py-6 text-lg rounded-full"
+                >
+                  <Camera className="h-6 w-6" />
+                  Start Recording
+                </Button>
+                <Button
+                  size="lg"
+                  onClick={handleUpload}
+                  className="bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-2 px-8 py-6 text-lg rounded-full"
+                  disabled={isUploading}
+                >
+                  {isUploading ? (
+                    <>
+                      <Upload className="h-6 w-6" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-6 w-6" />
+                      Upload Recording
+                    </>
+                  )}
+                </Button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept="video/webm"
+                  className="hidden"
+                />
+              </div>
             )}
           </div>
         ) : (
@@ -244,11 +368,11 @@ export default function ScreenRecordingPage() {
               </Card>
 
               <Tabs defaultValue="chat">
-                <TabsList className="grid grid-cols-3 mb-4">
-                  <TabsTrigger value="chat" className="flex items-center gap-2">
+                <TabsList className="grid grid-cols-2 mb-4 space-x-2">
+                  {/* <TabsTrigger value="chat" className="flex items-center gap-2">
                     <MessageSquare className="h-4 w-4" />
                     Chat
-                  </TabsTrigger>
+                  </TabsTrigger> */}
                   <TabsTrigger
                     value="summary"
                     className="flex items-center gap-2"
@@ -262,12 +386,15 @@ export default function ScreenRecordingPage() {
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="chat">
-                  <ChatInterface />
-                </TabsContent>
+                {/* <TabsContent value="chat">
+                  <ChatInterface summary={summary} />
+                </TabsContent> */}
 
                 <TabsContent value="summary">
-                  <AIGeneratedContent />
+                  <AIGeneratedContent
+                    summaries={summaries}
+                    setSummary={setSummary}
+                  />
                 </TabsContent>
 
                 <TabsContent value="help">
@@ -285,12 +412,12 @@ export default function ScreenRecordingPage() {
                             Record your screen by clicking the Record button
                           </span>
                         </li>
-                        <li className="flex items-start gap-2">
+                        {/* <li className="flex items-start gap-2">
                           <div className="mt-1 bg-slate-100 dark:bg-slate-800 rounded-full p-1">
                             <MessageSquare className="h-4 w-4 text-slate-500" />
                           </div>
                           <span>Discuss the recording in the Chat tab</span>
-                        </li>
+                        </li> */}
                         <li className="flex items-start gap-2">
                           <div className="mt-1 bg-emerald-100 dark:bg-emerald-900 rounded-full p-1">
                             <FileText className="h-4 w-4 text-emerald-500 dark:text-emerald-300" />
