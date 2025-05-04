@@ -197,8 +197,29 @@ if not DEBUG:
         'http://localhost:8001',
         'http://127.0.0.1:8000',
         'http://127.0.0.1:8001',
+        'http://localhost:3000',  # NextJS frontend
+        'http://127.0.0.1:3000',  # NextJS frontend
+        'http://localhost:3001',  # NextJS frontend alternate port
+        'http://127.0.0.1:3001',  # NextJS frontend alternate port
     ]
 CORS_ALLOW_CREDENTIALS = True  # Allow cookies to be sent with requests
 
 # CSRF settings
-CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'http://localhost:8001', 'http://127.0.0.1:8000', 'http://127.0.0.1:8001']
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000', 
+    'http://localhost:8001', 
+    'http://127.0.0.1:8000', 
+    'http://127.0.0.1:8001',
+    'http://localhost:3000',  # NextJS frontend
+    'http://127.0.0.1:3000',  # NextJS frontend
+    'http://localhost:3001',  # NextJS frontend alternate port
+    'http://127.0.0.1:3001',  # NextJS frontend alternate port
+]
+
+# Session settings - make cookies work with cross-origin requests
+SESSION_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = False  # Set to True in production
+
+# CSRF cookie settings
+CSRF_COOKIE_SAMESITE = 'None' 
+CSRF_COOKIE_SECURE = False  # Set to True in production
