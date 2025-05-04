@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Check,
   X,
+  Lightbulb,
 } from "lucide-react";
 import Link from "next/link";
 import CodeEditor from "@/components/code-editor";
@@ -63,6 +64,74 @@ export default function PythonEDIPage() {
     null
   );
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
+  const [activeTab, setActiveTab] = useState("output");
+  const [shouldShowHints, setShouldShowHints] = useState(false);
+  const [hintsTimerId, setHintsTimerId] = useState<NodeJS.Timeout | null>(null);
+  const [currentHintIndex, setCurrentHintIndex] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string>("");
+
+  // Get available hints based on task and code
+  const getAvailableHints = () => {
+    const hints: { title: string; content: string }[] = [];
+    
+    // First, add task-specific hints if available
+    if (currentTask?.hints && currentTask.hints.length > 0) {
+      currentTask.hints.forEach((hint, index) => {
+        hints.push({
+          title: `Task Hint ${index + 1}`,
+          content: hint
+        });
+      });
+    }
+    
+    // Then add code-based hints
+    if (code && code !== initialCode) {
+      if (code.includes('for ') || code.includes('while ')) {
+        hints.push({
+          title: 'Loop Optimization',
+          content: 'Consider using list comprehensions for simple loops to make your code more concise and often faster.'
+        });
+      }
+      
+      if (code.includes('if ') || code.includes('else:')) {
+        hints.push({
+          title: 'Simplify Conditionals',
+          content: 'Multiple if/else statements can often be simplified using dictionaries or more elegant patterns.'
+        });
+      }
+      
+      if (!code.includes('try:') && !code.includes('except ')) {
+        hints.push({
+          title: 'Error Handling',
+          content: 'Consider adding try/except blocks to handle potential errors gracefully.'
+        });
+      }
+      
+      // Always add this hint
+      hints.push({
+        title: 'Python Best Practice',
+        content: 'Use meaningful variable names and follow PEP 8 style guidelines for clean, readable code.'
+      });
+    }
+    
+    return hints;
+  };
+
+  // Calculate available hints for memoization
+  const availableHints = getAvailableHints();
+  
+  // Functions to navigate through hints
+  const goToNextHint = () => {
+    if (currentHintIndex < availableHints.length - 1) {
+      setCurrentHintIndex(currentHintIndex + 1);
+    }
+  };
+  
+  const goToPreviousHint = () => {
+    if (currentHintIndex > 0) {
+      setCurrentHintIndex(currentHintIndex - 1);
+    }
+  };
 
   useEffect(() => {
     // Set initial message
@@ -71,16 +140,34 @@ export default function PythonEDIPage() {
     );
   }, []);
 
-  // When a task is selected, update current task and set the first test case as selected
+  // When task is selected, update current task and set the first test case as selected
   const handleSelectTask = (task: Task) => {
     setCurrentTask(task);
     setCode(task.startingCode);
     setOutput("");
     setTestResult(null);
+    setCurrentHintIndex(0); // Reset hint index when changing tasks
 
     if (task.testCases && task.testCases.length > 0) {
       setSelectedTestCaseIndex(0);
       setCurrentTestCase(task.testCases[0]);
+    }
+
+    // If task has hints, automatically switch to the hints tab
+    if (task.hints && task.hints.length > 0) {
+      setShouldShowHints(true);
+      
+      // Clear any existing timer
+      if (hintsTimerId) {
+        clearTimeout(hintsTimerId);
+      }
+      
+      // Set a timer to switch to hints tab after a short delay
+      const timerId = setTimeout(() => {
+        setActiveTab("hints");
+      }, 500);
+      
+      setHintsTimerId(timerId);
     }
   };
 
@@ -95,10 +182,59 @@ export default function PythonEDIPage() {
     }
   };
 
+  // Detect code patterns and switch to hints tab if needed
+  useEffect(() => {
+    if (!code || code === initialCode) return;
+    
+    // Check for code patterns that suggest the user might need hints
+    const hasLoops = code.includes('for ') || code.includes('while ');
+    const hasConditionals = code.includes('if ') || code.includes('else:');
+    const hasNoErrorHandling = !code.includes('try:') && !code.includes('except ');
+    
+    // If there are hints in the task or certain patterns detected, show hints
+    const shouldSwitchToHints = 
+      (currentTask?.hints && currentTask.hints.length > 0) || 
+      (hasLoops && code.length > initialCode.length + 20) || 
+      (hasConditionals && hasNoErrorHandling && code.length > initialCode.length + 30);
+    
+    // If the hints composition would change significantly, reset the hint index
+    const newHintsLength = getAvailableHints().length;
+    if (newHintsLength !== availableHints.length) {
+      setCurrentHintIndex(0);
+    }
+    
+    if (shouldSwitchToHints && activeTab !== "hints" && !shouldShowHints) {
+      setShouldShowHints(true);
+      
+      // Clear any existing timer
+      if (hintsTimerId) {
+        clearTimeout(hintsTimerId);
+      }
+      
+      // Set a timer to switch to hints tab after a short delay
+      const timerId = setTimeout(() => {
+        setActiveTab("hints");
+      }, 1000);
+      
+      setHintsTimerId(timerId);
+    }
+  }, [code, currentTask, activeTab, shouldShowHints, hintsTimerId, initialCode, availableHints.length]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (hintsTimerId) {
+        clearTimeout(hintsTimerId);
+      }
+    };
+  }, [hintsTimerId]);
+
   const runCode = async () => {
     setIsRunning(true);
     setOutput("Running...");
     setTestResult(null);
+    setActiveTab("output"); // Switch to output tab when running code
+    setErrorMessage(""); // Clear previous errors
 
     try {
       // Make sure we have a test case selected
@@ -137,14 +273,20 @@ export default function PythonEDIPage() {
         setTestResult("success");
       } else {
         setTestResult("failure");
+        
+        // If the test failed, check for error messages in the output
+        const resultStr = JSON.stringify(result, null, 2);
+        if (resultStr.includes("error") || resultStr.includes("Exception") || resultStr.includes("Traceback")) {
+          setErrorMessage(resultStr);
+        }
       }
 
       setIsRunning(false);
     } catch (error) {
       console.error("Python execution error:", error);
-      setOutput(
-        `Error: ${error instanceof Error ? error.message : String(error)}`
-      );
+      const errorMsg = `Error: ${error instanceof Error ? error.message : String(error)}`;
+      setOutput(errorMsg);
+      setErrorMessage(errorMsg);
       setTestResult("failure");
       setIsRunning(false);
     }
@@ -235,10 +377,20 @@ export default function PythonEDIPage() {
 
             {/* Output Tabs */}
             <div className="border rounded-lg overflow-hidden h-[30vh]">
-              <Tabs defaultValue="output" className="h-full flex flex-col">
+              <Tabs 
+                value={activeTab} 
+                onValueChange={setActiveTab} 
+                className="h-full flex flex-col"
+              >
                 <TabsList className="mx-4 mt-2">
                   <TabsTrigger value="output">Output</TabsTrigger>
                   <TabsTrigger value="chat">Chat Assistance</TabsTrigger>
+                  <TabsTrigger value="hints" className={shouldShowHints ? "animate-pulse bg-amber-100 dark:bg-amber-900/30" : ""}>
+                    Hints
+                    {shouldShowHints && (
+                      <span className="ml-1 inline-flex h-2 w-2 rounded-full bg-amber-500"></span>
+                    )}
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="output" className="flex-grow p-0 m-0">
@@ -262,8 +414,66 @@ export default function PythonEDIPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="chat" className="flex-grow p-0 m-0">
-                  <ChatAssistance code={code} />
+                <TabsContent value="chat" className="flex-grow p-0 m-0 relative">
+                  <div className="absolute inset-0">
+                    <ChatAssistance code={code} taskId={currentTask?.id} errorMessage={errorMessage} />
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="hints" className="flex-grow p-0 m-0">
+                  <div className="h-full overflow-y-auto p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Lightbulb className="h-5 w-5 text-amber-500" />
+                        <h3 className="text-lg font-semibold">Coding Hints</h3>
+                      </div>
+                      
+                      {availableHints.length > 0 && (
+                        <div className="text-sm text-slate-500">
+                          {currentHintIndex + 1} of {availableHints.length}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {availableHints.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                          <h4 className="font-medium text-amber-700 dark:text-amber-400 text-lg">
+                            {availableHints[currentHintIndex].title}
+                          </h4>
+                          <p className="text-sm mt-3 text-slate-700 dark:text-slate-300">
+                            {availableHints[currentHintIndex].content}
+                          </p>
+                          
+                          <div className="flex justify-between mt-6">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={goToPreviousHint}
+                              disabled={currentHintIndex === 0}
+                              className="border-amber-300 hover:bg-amber-100 text-amber-700"
+                            >
+                              Previous Hint
+                            </Button>
+                            
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={goToNextHint}
+                              disabled={currentHintIndex === availableHints.length - 1}
+                              className="border-amber-300 hover:bg-amber-100 text-amber-700"
+                            >
+                              Next Hint
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center text-slate-500 py-8">
+                        <p>Write some code to see helpful hints appear here.</p>
+                      </div>
+                    )}
+                  </div>
                 </TabsContent>
               </Tabs>
             </div>

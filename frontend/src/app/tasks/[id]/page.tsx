@@ -39,7 +39,7 @@ export default function TaskPage({ params }: { params: { id: string } }) {
   const [userName, setUserName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submission, setSubmission] = useState<Submission | null>(null);
-
+  
   useEffect(() => {
     const fetchTask = async () => {
       try {
