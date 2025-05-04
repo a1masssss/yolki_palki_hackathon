@@ -73,60 +73,64 @@ export default function PythonEDIPage() {
   // Get available hints based on task and code
   const getAvailableHints = () => {
     const hints: { title: string; content: string }[] = [];
-    
+
     // First, add task-specific hints if available
     if (currentTask?.hints && currentTask.hints.length > 0) {
       currentTask.hints.forEach((hint, index) => {
         hints.push({
           title: `Task Hint ${index + 1}`,
-          content: hint
+          content: hint,
         });
       });
     }
-    
+
     // Then add code-based hints
     if (code && code !== initialCode) {
-      if (code.includes('for ') || code.includes('while ')) {
+      if (code.includes("for ") || code.includes("while ")) {
         hints.push({
-          title: 'Loop Optimization',
-          content: 'Consider using list comprehensions for simple loops to make your code more concise and often faster.'
+          title: "Loop Optimization",
+          content:
+            "Consider using list comprehensions for simple loops to make your code more concise and often faster.",
         });
       }
-      
-      if (code.includes('if ') || code.includes('else:')) {
+
+      if (code.includes("if ") || code.includes("else:")) {
         hints.push({
-          title: 'Simplify Conditionals',
-          content: 'Multiple if/else statements can often be simplified using dictionaries or more elegant patterns.'
+          title: "Simplify Conditionals",
+          content:
+            "Multiple if/else statements can often be simplified using dictionaries or more elegant patterns.",
         });
       }
-      
-      if (!code.includes('try:') && !code.includes('except ')) {
+
+      if (!code.includes("try:") && !code.includes("except ")) {
         hints.push({
-          title: 'Error Handling',
-          content: 'Consider adding try/except blocks to handle potential errors gracefully.'
+          title: "Error Handling",
+          content:
+            "Consider adding try/except blocks to handle potential errors gracefully.",
         });
       }
-      
+
       // Always add this hint
       hints.push({
-        title: 'Python Best Practice',
-        content: 'Use meaningful variable names and follow PEP 8 style guidelines for clean, readable code.'
+        title: "Python Best Practice",
+        content:
+          "Use meaningful variable names and follow PEP 8 style guidelines for clean, readable code.",
       });
     }
-    
+
     return hints;
   };
 
   // Calculate available hints for memoization
   const availableHints = getAvailableHints();
-  
+
   // Functions to navigate through hints
   const goToNextHint = () => {
     if (currentHintIndex < availableHints.length - 1) {
       setCurrentHintIndex(currentHintIndex + 1);
     }
   };
-  
+
   const goToPreviousHint = () => {
     if (currentHintIndex > 0) {
       setCurrentHintIndex(currentHintIndex - 1);
@@ -156,18 +160,11 @@ export default function PythonEDIPage() {
     // If task has hints, automatically switch to the hints tab
     if (task.hints && task.hints.length > 0) {
       setShouldShowHints(true);
-      
+
       // Clear any existing timer
       if (hintsTimerId) {
         clearTimeout(hintsTimerId);
       }
-      
-      // Set a timer to switch to hints tab after a short delay
-      const timerId = setTimeout(() => {
-        setActiveTab("hints");
-      }, 500);
-      
-      setHintsTimerId(timerId);
     }
   };
 
@@ -185,40 +182,51 @@ export default function PythonEDIPage() {
   // Detect code patterns and switch to hints tab if needed
   useEffect(() => {
     if (!code || code === initialCode) return;
-    
+
     // Check for code patterns that suggest the user might need hints
-    const hasLoops = code.includes('for ') || code.includes('while ');
-    const hasConditionals = code.includes('if ') || code.includes('else:');
-    const hasNoErrorHandling = !code.includes('try:') && !code.includes('except ');
-    
+    const hasLoops = code.includes("for ") || code.includes("while ");
+    const hasConditionals = code.includes("if ") || code.includes("else:");
+    const hasNoErrorHandling =
+      !code.includes("try:") && !code.includes("except ");
+
     // If there are hints in the task or certain patterns detected, show hints
-    const shouldSwitchToHints = 
-      (currentTask?.hints && currentTask.hints.length > 0) || 
-      (hasLoops && code.length > initialCode.length + 20) || 
-      (hasConditionals && hasNoErrorHandling && code.length > initialCode.length + 30);
-    
+    const shouldSwitchToHints =
+      (currentTask?.hints && currentTask.hints.length > 0) ||
+      (hasLoops && code.length > initialCode.length + 20) ||
+      (hasConditionals &&
+        hasNoErrorHandling &&
+        code.length > initialCode.length + 30);
+
     // If the hints composition would change significantly, reset the hint index
     const newHintsLength = getAvailableHints().length;
     if (newHintsLength !== availableHints.length) {
       setCurrentHintIndex(0);
     }
-    
+
     if (shouldSwitchToHints && activeTab !== "hints" && !shouldShowHints) {
       setShouldShowHints(true);
-      
+
       // Clear any existing timer
       if (hintsTimerId) {
         clearTimeout(hintsTimerId);
       }
-      
+
       // Set a timer to switch to hints tab after a short delay
       const timerId = setTimeout(() => {
         setActiveTab("hints");
       }, 1000);
-      
+
       setHintsTimerId(timerId);
     }
-  }, [code, currentTask, activeTab, shouldShowHints, hintsTimerId, initialCode, availableHints.length]);
+  }, [
+    code,
+    currentTask,
+    activeTab,
+    shouldShowHints,
+    hintsTimerId,
+    initialCode,
+    availableHints.length,
+  ]);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -264,19 +272,49 @@ export default function PythonEDIPage() {
         // Format the object as a readable string
         setOutput(JSON.stringify(result, null, 2));
         console.log("Output set to:", JSON.stringify(result, null, 2));
+
+        // Check if result is an array of test case results
+        if (Array.isArray(result)) {
+          // Check if all test cases passed
+          const allPassed = result.every(
+            (testCase) => testCase.passed === true
+          );
+          setTestResult(allPassed ? "success" : "failure");
+
+          // If any test case failed, extract error message if available
+          if (!allPassed) {
+            const failedTest = result.find((testCase) => !testCase.passed);
+            if (failedTest) {
+              setErrorMessage(
+                `Test case with input "${failedTest.input}" failed. Expected: ${failedTest.expected_output}, Got: ${failedTest.actual_output}`
+              );
+            }
+          }
+        } else if (result.success !== undefined) {
+          // Handle single test case result with success property
+          setTestResult(result.success ? "success" : "failure");
+        }
       } else {
         setOutput(String(result));
         console.log("Output set to:", String(result));
       }
 
-      if (response.data.success) {
-        setTestResult("success");
-      } else {
-        setTestResult("failure");
-        
-        // If the test failed, check for error messages in the output
-        const resultStr = JSON.stringify(result, null, 2);
-        if (resultStr.includes("error") || resultStr.includes("Exception") || resultStr.includes("Traceback")) {
+      // Fallback to response.data.success if result structure doesn't contain test results
+      if (testResult === null && response.data.success !== undefined) {
+        setTestResult(response.data.success ? "success" : "failure");
+      }
+
+      // If the test failed, check for error messages in the output
+      if (testResult === "failure") {
+        const resultStr =
+          typeof result === "object"
+            ? JSON.stringify(result, null, 2)
+            : String(result);
+        if (
+          resultStr.includes("error") ||
+          resultStr.includes("Exception") ||
+          resultStr.includes("Traceback")
+        ) {
           setErrorMessage(resultStr);
         }
       }
@@ -284,7 +322,9 @@ export default function PythonEDIPage() {
       setIsRunning(false);
     } catch (error) {
       console.error("Python execution error:", error);
-      const errorMsg = `Error: ${error instanceof Error ? error.message : String(error)}`;
+      const errorMsg = `Error: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
       setOutput(errorMsg);
       setErrorMessage(errorMsg);
       setTestResult("failure");
@@ -304,6 +344,36 @@ export default function PythonEDIPage() {
     navigator.clipboard.writeText(code);
   };
 
+  // Add custom scrollbar styles for the hints container
+  useEffect(() => {
+    const styleEl = document.createElement("style");
+    styleEl.textContent = `
+      .hints-container::-webkit-scrollbar {
+        width: 8px;
+      }
+      .hints-container::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .hints-container::-webkit-scrollbar-thumb {
+        background-color: #d1d5db;
+        border-radius: 4px;
+      }
+      .hints-container::-webkit-scrollbar-thumb:hover {
+        background-color: #9ca3af;
+      }
+      .dark .hints-container::-webkit-scrollbar-thumb {
+        background-color: #4b5563;
+      }
+      .dark .hints-container::-webkit-scrollbar-thumb:hover {
+        background-color: #6b7280;
+      }
+    `;
+    document.head.appendChild(styleEl);
+    return () => {
+      document.head.removeChild(styleEl);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4">
       <div className="max-w-7xl mx-auto">
@@ -318,12 +388,12 @@ export default function PythonEDIPage() {
           {/* Left column - Task Generator */}
           <div className="lg:col-span-1 space-y-6">
             <TaskGenerator onSelectTask={handleSelectTask} />
-            {currentTask && (
+            {/* {currentTask && (
               <AISolutionGenerator
                 taskTitle={currentTask.title}
                 taskDescription={currentTask.description}
               />
-            )}
+            )} */}
           </div>
 
           {/* Right column - Editor and Output */}
@@ -376,16 +446,23 @@ export default function PythonEDIPage() {
             </div>
 
             {/* Output Tabs */}
-            <div className="border rounded-lg overflow-hidden h-[30vh]">
-              <Tabs 
-                value={activeTab} 
-                onValueChange={setActiveTab} 
+            <div className="border rounded-lg overflow-hidden flex flex-col h-[40vh]">
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
                 className="h-full flex flex-col"
               >
-                <TabsList className="mx-4 mt-2">
+                <TabsList className="mx-4 mt-2 space-x-2">
                   <TabsTrigger value="output">Output</TabsTrigger>
                   <TabsTrigger value="chat">Chat Assistance</TabsTrigger>
-                  <TabsTrigger value="hints" className={shouldShowHints ? "animate-pulse bg-amber-100 dark:bg-amber-900/30" : ""}>
+                  <TabsTrigger
+                    value="hints"
+                    className={
+                      shouldShowHints
+                        ? "animate-pulse bg-amber-100 dark:bg-amber-900/30"
+                        : ""
+                    }
+                  >
                     Hints
                     {shouldShowHints && (
                       <span className="ml-1 inline-flex h-2 w-2 rounded-full bg-amber-500"></span>
@@ -396,14 +473,9 @@ export default function PythonEDIPage() {
                 <TabsContent value="output" className="flex-grow p-0 m-0">
                   <div className="h-full">
                     <div className="bg-black text-green-400 font-mono p-4 h-full overflow-auto whitespace-pre-wrap">
-                      {output || "Run your code to see output here"}
                       {testResult && (
                         <div
-                          className={`mt-4 p-2 rounded ${
-                            testResult === "success"
-                              ? "bg-green-900"
-                              : "bg-red-900"
-                          }`}
+                          className={`mt-4 p-2 rounded`}
                         >
                           {testResult === "success"
                             ? "✅ Test Passed! Your output matches the expected result."
@@ -414,27 +486,37 @@ export default function PythonEDIPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="chat" className="flex-grow p-0 m-0 relative">
+                <TabsContent
+                  value="chat"
+                  className="flex-grow p-0 m-0 relative"
+                >
                   <div className="absolute inset-0">
-                    <ChatAssistance code={code} taskId={currentTask?.id} errorMessage={errorMessage} />
+                    <ChatAssistance
+                      code={code}
+                      taskId={currentTask?.id}
+                      errorMessage={errorMessage}
+                    />
                   </div>
                 </TabsContent>
-                
-                <TabsContent value="hints" className="flex-grow p-0 m-0">
-                  <div className="h-full overflow-y-auto p-4">
+
+                <TabsContent
+                  value="hints"
+                  className="flex-grow p-0 mt-3 overflow-hidden"
+                >
+                  <div className="h-full overflow-y-auto p-4 hints-container">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
                         <Lightbulb className="h-5 w-5 text-amber-500" />
                         <h3 className="text-lg font-semibold">Coding Hints</h3>
                       </div>
-                      
+
                       {availableHints.length > 0 && (
                         <div className="text-sm text-slate-500">
                           {currentHintIndex + 1} of {availableHints.length}
                         </div>
                       )}
                     </div>
-                    
+
                     {availableHints.length > 0 ? (
                       <div className="space-y-4">
                         <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
@@ -444,23 +526,25 @@ export default function PythonEDIPage() {
                           <p className="text-sm mt-3 text-slate-700 dark:text-slate-300">
                             {availableHints[currentHintIndex].content}
                           </p>
-                          
+
                           <div className="flex justify-between mt-6">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={goToPreviousHint}
                               disabled={currentHintIndex === 0}
                               className="border-amber-300 hover:bg-amber-100 text-amber-700"
                             >
                               Previous Hint
                             </Button>
-                            
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
+
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={goToNextHint}
-                              disabled={currentHintIndex === availableHints.length - 1}
+                              disabled={
+                                currentHintIndex === availableHints.length - 1
+                              }
                               className="border-amber-300 hover:bg-amber-100 text-amber-700"
                             >
                               Next Hint

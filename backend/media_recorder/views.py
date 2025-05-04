@@ -13,7 +13,7 @@ import time
 
 client = genai.Client(
     api_key=os.getenv('GEMINI_API_KEY'),
-    http_options=types.HttpOptions(api_version='v1alpha')
+    # http_options=types.HttpOptions(api_version='v1alpha')
 )
 
 @csrf_exempt

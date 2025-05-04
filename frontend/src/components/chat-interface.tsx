@@ -22,6 +22,37 @@ export default function ChatInterface({ summary }: { summary: string }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Add custom scrollbar styles
+  useEffect(() => {
+    const styleEl = document.createElement("style");
+    styleEl.textContent = `
+      .messages-container::-webkit-scrollbar {
+        width: 8px;
+      }
+      .messages-container::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .messages-container::-webkit-scrollbar-thumb {
+        background-color: #d1d5db;
+        border-radius: 4px;
+      }
+      .messages-container::-webkit-scrollbar-thumb:hover {
+        background-color: #9ca3af;
+      }
+      .dark .messages-container::-webkit-scrollbar-thumb {
+        background-color: #4b5563;
+      }
+      .dark .messages-container::-webkit-scrollbar-thumb:hover {
+        background-color: #6b7280;
+      }
+    `;
+    document.head.appendChild(styleEl);
+    return () => {
+      document.head.removeChild(styleEl);
+    };
+  }, []);
+
   const { messages, input, handleInputChange, handleSubmit } = useChat({});
 
   const formatTime = (date: string | Date) => {
@@ -51,7 +82,7 @@ export default function ChatInterface({ summary }: { summary: string }) {
 
   return (
     <div className="flex flex-col h-[600px] border rounded-md bg-white dark:bg-slate-900">
-      <div className="flex-grow overflow-y-auto p-4">
+      <div className="flex-grow overflow-y-auto p-4 messages-container">
         {messages.map((message) => (
           <div
             key={message.id}
