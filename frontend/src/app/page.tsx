@@ -20,7 +20,7 @@ export default function Home() {
           Screen Recording & Python EDI
         </h1>
 
-        <div className="grid md:grid-cols-3 gap-8 mt-8">
+        <div className="grid md:grid-cols-2 gap-8 mt-8">
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -51,7 +51,7 @@ export default function Home() {
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Code className="h-6 w-6 text-blue-500" />
+                <Code className="h-6 w-6 text-green-500" />
                 Python EDI
               </CardTitle>
               <CardDescription>
@@ -68,14 +68,14 @@ export default function Home() {
             </CardContent>
             <CardFooter>
               <Link href="/python-code" className="w-full">
-                <Button className="w-full bg-blue-500 hover:bg-blue-600">
+                <Button className="w-full bg-green-500 hover:bg-green-600">
                   Go to Python EDI
                 </Button>
               </Link>
             </CardFooter>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow">
+          {/* <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-6 w-6 text-green-500" />
@@ -99,7 +99,7 @@ export default function Home() {
                 </Button>
               </Link>
             </CardFooter>
-          </Card>
+          </Card> */}
         </div>
       </div>
     </main>
