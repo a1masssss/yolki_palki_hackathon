@@ -5,11 +5,11 @@ import { mockTasks, mockSubmissions } from './mock-data';
 const determineApiUrl = () => {
   // Check if we're in the browser
   if (typeof window !== 'undefined') {
-    // For local development, use localhost:8000
-    return 'http://127.0.0.1:8000';
+    // For local development, use localhost:8002
+    return 'http://127.0.0.1:8002';
   }
   // For server-side rendering, use a fallback
-  return 'http://127.0.0.1:8000';
+  return 'http://127.0.0.1:8002';
 };
 
 // Базовый URL для API

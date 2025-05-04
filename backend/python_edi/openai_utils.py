@@ -110,7 +110,7 @@ def process_code_locally(code, test_input=None):
             "error": f"Error in local execution: {str(e)}"
         }
 
-def get_ai_assistance(code, error_message, task_description):
+def get_ai_assistance(code, error_message, task_description, user_message=""):
     """
     Get AI assistance for debugging Python code.
     """
@@ -166,6 +166,8 @@ Feel free to ask specific questions about your code!"""
     ```
     
     Error message: {error_message}
+    
+    User question: {user_message}
     
     Can you help me understand what's wrong and how to fix it?
     """

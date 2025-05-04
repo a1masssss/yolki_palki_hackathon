@@ -266,8 +266,8 @@ def get_assistance(request, task_id):
             )
         
         # Get assistance from OpenAI
-        combined_message = f"{user_message}\n\nCode:\n{code}\n\nError: {error_message}"
-        ai_response = get_ai_assistance(code, error_message, task.description)
+        task_description = task.description if task else "No task description available"
+        ai_response = get_ai_assistance(code, error_message, task_description, user_message)
         
         # Save AI response if user is authenticated
         if user:
