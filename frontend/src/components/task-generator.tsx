@@ -19,6 +19,14 @@ import { Label } from "@/components/ui/label";
 import { ChevronDown, ChevronRight, Lightbulb, Info } from "lucide-react";
 import axios from "axios";
 
+// Add a function to get CSRF token
+function getCookie(name: string): string | null {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+  return null;
+}
+
 // Define task structure
 interface Task {
   id: string;
@@ -46,11 +54,25 @@ export default function TaskGenerator({
   const [openHints, setOpenHints] = useState<{ [key: number]: boolean }>({});
 
   const generateTask = () => {
+    console.log("Generate task button clicked");
+    console.log("Selected difficulty:", selectedDifficulty);
+    
+    // Get CSRF token
+    const csrftoken = getCookie('csrftoken');
+    console.log("CSRF Token:", csrftoken);
+    
     axios
       .post("http://127.0.0.1:8000/python-edi/generate-task/", {
         difficulty: selectedDifficulty,
+      }, {
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrftoken || '',
+        }
       })
       .then((response) => {
+        console.log("Task generation successful:", response.data);
         const apiTask = response.data;
         const formattedTask = {
           id: apiTask.id.toString(),
@@ -74,9 +96,10 @@ export default function TaskGenerator({
       })
       .catch((error) => {
         console.error("Error fetching task:", error);
+        console.error("Error details:", error.response?.data || "No response data");
+        console.error("Status code:", error.response?.status || "No status code");
+        alert("Failed to generate task. Check browser console for details.");
       });
-
-    console.log(currentTask);
   };
 
   const toggleHint = (index: number) => {

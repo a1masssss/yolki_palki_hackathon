@@ -80,7 +80,14 @@ export default function TasksPage() {
       <h1 className="text-3xl font-bold mb-6">Programming Tasks</h1>
       
       <div className="mb-6 p-4 bg-gray-100 rounded-lg">
-        <h2 className="text-xl font-bold mb-2">Get Random Task</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Get Random Task</h2>
+          <Link href="/task-history">
+            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+              View Task History
+            </button>
+          </Link>
+        </div>
         <div className="flex flex-wrap items-center gap-4">
           <select 
             className="p-2 border rounded" 

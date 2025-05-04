@@ -1,3 +1,5 @@
+'use client';
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Camera, Code } from "lucide-react";
+import { Camera, Code, User } from "lucide-react";
 
 export default function Home() {
   return (
@@ -18,7 +20,7 @@ export default function Home() {
           Screen Recording & Python EDI
         </h1>
 
-        <div className="grid md:grid-cols-2 gap-8 mt-8">
+        <div className="grid md:grid-cols-3 gap-8 mt-8">
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -47,27 +49,53 @@ export default function Home() {
           </Card>
 
           <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="mb-3">
-              <CardTitle className="flex items-center gap-2 mb-2">
-                <Code className="h-6 w-6 text-emerald-500" />
-                Python EDI Module
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Code className="h-6 w-6 text-blue-500" />
+                Python EDI
               </CardTitle>
-              <CardDescription >
-                Write, execute, and get assistance with Python code in the
-                browser
+              <CardDescription>
+                Create, debug, and improve your Python code with AI-powered 
+                assistance and feedback
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-40 bg-slate-200 dark:bg-slate-800 rounded-md flex items-center justify-center">
                 <p className="text-slate-500 dark:text-slate-400">
-                  Code, compile, and learn Python with real-time assistance
+                  Code, analyze, and improve your Python skills
                 </p>
               </div>
             </CardContent>
             <CardFooter>
               <Link href="/python-code" className="w-full">
-                <Button className="w-full bg-emerald-500 hover:bg-emerald-600">
-                  Go to Python Code
+                <Button className="w-full bg-blue-500 hover:bg-blue-600">
+                  Go to Python EDI
+                </Button>
+              </Link>
+            </CardFooter>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-6 w-6 text-green-500" />
+                Task History
+              </CardTitle>
+              <CardDescription>
+                View your completed tasks and track your learning progress
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-40 bg-slate-200 dark:bg-slate-800 rounded-md flex items-center justify-center">
+                <p className="text-slate-500 dark:text-slate-400">
+                  Track your progress and see your submissions
+                </p>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Link href="/task-history" className="w-full">
+                <Button className="w-full bg-green-500 hover:bg-green-600">
+                  View Task History
                 </Button>
               </Link>
             </CardFooter>
